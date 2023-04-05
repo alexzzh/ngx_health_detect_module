@@ -601,7 +601,7 @@ ngx_http_health_detect_check_init_shm_zone(ngx_shm_zone_t *shm_zone,
 
     shm_zone->data = data;
 
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
                   "init shm zone on %P when reload", ngx_pid);
 
     return NGX_OK;
@@ -653,7 +653,7 @@ static char *ngx_http_health_detect_init_shm(ngx_conf_t *cf,
   nhscf->check_zone = check_zone;
   nhscf->check_zone->init = ngx_http_health_detect_check_init_shm_zone;
 
-  ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+  ngx_log_error(NGX_LOG_DEBUG, cf->log, 0,
                 "health_detect srv conf: check_zone name(%V) size(%ui)M",
                 zone_name, size / 1024 / 1024);
 
@@ -689,7 +689,7 @@ static char *ngx_http_health_detect_merge_srv_conf(ngx_conf_t *cf, void *parent,
   peers_manager_ctx->nhscf = conf;
 
   ngx_log_error(
-      NGX_LOG_ERR, cf->log, 0,
+      NGX_LOG_DEBUG, cf->log, 0,
       "http health detect module srv conf: enable(%ui) max_check_nums(%ui) "
       "max_history_status_count(%ui)",
       conf->enable, conf->max_check_nums, conf->max_history_status_count);
@@ -801,7 +801,8 @@ static char *ngx_http_health_detect_check_zone(ngx_conf_t *cf,
 
   if (n < CHECK_SHM_SIZE_MIN_VALUE) {
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "http health detect module  zone \"%V\" is too small", &value[1]);
+                       "http health detect module  zone \"%V\" is too small",
+                       &value[1]);
 
     return NGX_CONF_ERROR;
   }
@@ -810,7 +811,8 @@ static char *ngx_http_health_detect_check_zone(ngx_conf_t *cf,
 
 invalid:
   ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                     "invalid http health detect module check zone \"%V\"", &value[1]);
+                     "invalid http health detect module check zone \"%V\"",
+                     &value[1]);
   return NGX_CONF_ERROR;
 }
 
@@ -2161,7 +2163,7 @@ static ngx_int_t ngx_health_detect_add_or_update_node_on_shm(
   peers_shm->number++;
   ngx_shmtx_unlock(&shpool->mutex);
 
-  ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+  ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                 "on shm: op(add/update) add node peer name(%V) peer addr(%V)",
                 &policy->peer_name, &policy->peer_addr.name);
   return NGX_OK;
@@ -2229,7 +2231,7 @@ static ngx_int_t ngx_health_detect_add_or_update_node_on_local(
       ngx_align(peer_size + peer_policy_max_size, ngx_cacheline_size),
       ngx_cycle->log);
   if (temp_pool == NULL) {
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                   "on local: op(add/update) create pool error");
   }
 
@@ -2782,7 +2784,7 @@ static void ngx_http_health_detect_timeout_handler(ngx_event_t *event) {
 
   peer->pc.connection->error = 1;
 
-  ngx_log_error(NGX_LOG_ERR, event->log, 0, "check time out with peer: %V ",
+  ngx_log_error(NGX_LOG_WARN, event->log, 0, "check time out with peer: %V ",
                 &peer->policy->peer_name);
 
   if (ngx_http_health_detect_status_update(node, NGX_CHECK_STATUS_DOWN) !=
@@ -3564,7 +3566,7 @@ ngx_health_detect_prase_request_body(ngx_http_request_t *r, ngx_str_t peer_name,
 
     *prase_error = NGX_PRASE_REQ_OK;
 
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+    ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                   "policy:peer_name(%V) type(%ui) peer_addr(%V)"
                   "send_content(%V) alert_method(%ui) "
                   "expect_response_status(%ui) "
@@ -3791,7 +3793,7 @@ ngx_http_health_detect_reload_peer_node(ngx_rbtree_node_t *node_shm,
   hash = ngx_crc32_short(peer_name->data, peer_name->len);
   node = ngx_http_health_detect_peers_rbtree_lookup(hash, peer_name);
   if (node == NULL) {
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                   "on reload peer: reload peer name(%V) on perocess(%P)",
                   peer_name, ngx_pid);
     ngx_health_detect_add_or_update_node_on_local(&peer_shm->policy);
@@ -3821,7 +3823,7 @@ ngx_http_health_detect_add_reload_timers_handler(ngx_event_t *event) {
   ngx_http_health_detect_reload_peer_node(node_shm, sentinel);
   ngx_shmtx_unlock(&shpool->mutex);
 
-  ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+  ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                 "reload with start flag(%ui) on %P", 0, ngx_pid);
 
   ngx_add_timer(event, 3000);
