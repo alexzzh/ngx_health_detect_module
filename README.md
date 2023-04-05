@@ -51,7 +51,7 @@ Table of Contents
 
 ```
 git clone https://github.com/nginx/nginx.git
-git clone http://git.koal.com/zhangzhenghao/ngx_http_health_detect_module.git
+git clone https://github.com/alexzzh/ngx_http_health_detect_module.git
 
 cd nginx/;
 git checkout branches/stable-xxx
@@ -309,11 +309,11 @@ MemFree:         3156588 kB
 
 报告错误
 
-- 点击提交[GitHub Issue](http://git.koal.com/zhangzhenghao/gx_http_health_detect_module.git/issues),
+- 点击提交[GitHub Issue](https://github.com/alexzzh/ngx_http_health_detect_module/issues),
 
 提交你的修复补丁
 
-- 点击提交[Pull request](http://git.koal.com/zhangzhenghao/gx_http_health_detect_module.git/pull/new/master)
+- 点击提交[Pull request](https://github.com/alexzzh/ngx_http_health_detect_module/pulls)
 
 [Back to TOC](#table-of-contents)
 
