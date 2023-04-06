@@ -6,9 +6,9 @@
 -----
 
 - 所有后端节点健康状态  
-![check_all_node](check_all_node-html.png)
+![check_all_node](pic/check_all_node-html.png)
 - 单个后端节点健康状态，历史状态以及探测策略信息
-![check_one_node](check_one_node-html.jpg)
+![check_one_node](pic/check_one_node-html.jpg)
 
 
 Table of Contents
@@ -16,6 +16,7 @@ Table of Contents
 
 * [描述](#描述)
 * [如何安装](#如何安装)
+* [开发者快速指南](#开发者快速指南)
 * [基本用法](#基本用法)
 * [探测策略各字段解释](#探测策略各字段解释)
 * [restful接口说明](#restful接口说明)
@@ -51,13 +52,20 @@ Table of Contents
 
 ```
 git clone https://github.com/nginx/nginx.git
-git clone https://github.com/alexzzh/ngx_http_health_detect_module.git
-
+git clone http://git.koal.com/zhangzhenghao/ngx_http_health_detect_module
 cd nginx/;
 git checkout branches/stable-xxx
 ./auto/configure --add-module=../ngx_http_health_detect_module/
 make && make install
 ```
+
+[Back to TOC](#table-of-contents)
+
+开发者快速指南
+=====
+
+- 类图以及重要成员变量说明
+![class](pic/class-1.jpg)
 
 [Back to TOC](#table-of-contents)
 
@@ -104,9 +112,13 @@ http {
 
 `默认值`: 
 - 探测类型为tcp
-> {"send_content":"","alert_method":"log","expect_response_status":"","check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}  
+``` python
+ {"send_content":"","alert_method":"log","expect_response_status":"","check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}  
+```
 - 探测类型为http
-> {"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}
+``` python
+{"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}
+```
 
 `详细参数`
 - peer_type: 探测类型
@@ -172,7 +184,7 @@ curl http://server_ip:server_port/check_all_status
 ```python
 curl http://server_ip:server_port/check_all_status?format=html
 ```
-![check_all_node](check_all_node-html.png)
+![check_all_node](pic/check_all_node-html.png)
  
 - 查询单个后端节点的探测策略以及历史状态，输出格式: json 
 
@@ -204,7 +216,7 @@ http://server_ip:server_port/check_status/nginx8001
 ```python
 http://server_ip:server_port/check_status/nginx8001?format=html
 ```
-![check_one_node](check_one_node-html.jpg)
+![check_one_node](pic/check_one_node-html.jpg)
 
 [Back to TOC](#table-of-contents)
 
@@ -286,6 +298,7 @@ MemFree:         3156588 kB
 | 8000 | http | 短连接 | 5 | 4 | 5% | 0.8% |
 
 [Back to TOC](#table-of-contents)
+
 
 未完成的工作
 =========
