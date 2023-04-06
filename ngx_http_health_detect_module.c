@@ -322,7 +322,7 @@ typedef struct {
   ngx_http_health_detect_peers_shm_t
       *peers_shm; /* ngx_http_health_detect_peer_shm_t */
 
-  ngx_http_health_detect_srv_conf_t *nhscf;
+  ngx_http_health_detect_srv_conf_t *hdscf;
 } ngx_http_health_detect_peers_manager_t;
 
 ngx_http_health_detect_peers_manager_t *peers_manager_ctx = NULL;
@@ -568,19 +568,19 @@ ngx_module_t ngx_http_health_detect_module = {
     NGX_MODULE_V1_PADDING};
 
 static void *ngx_http_health_detect_create_srv_conf(ngx_conf_t *cf) {
-  ngx_http_health_detect_srv_conf_t *nhscf;
+  ngx_http_health_detect_srv_conf_t *hdscf;
 
-  nhscf = ngx_pcalloc(cf->pool, sizeof(ngx_http_health_detect_srv_conf_t));
-  if (nhscf == NULL) {
+  hdscf = ngx_pcalloc(cf->pool, sizeof(ngx_http_health_detect_srv_conf_t));
+  if (hdscf == NULL) {
     return NULL;
   }
 
-  nhscf->enable = NGX_CONF_UNSET;
-  nhscf->max_check_nums = NGX_CONF_UNSET_UINT;
-  nhscf->max_history_status_count = NGX_CONF_UNSET_UINT;
-  nhscf->check_zone = NGX_CONF_UNSET_PTR;
+  hdscf->enable = NGX_CONF_UNSET;
+  hdscf->max_check_nums = NGX_CONF_UNSET_UINT;
+  hdscf->max_history_status_count = NGX_CONF_UNSET_UINT;
+  hdscf->check_zone = NGX_CONF_UNSET_PTR;
 
-  return nhscf;
+  return hdscf;
 }
 
 static ngx_int_t
@@ -588,21 +588,29 @@ ngx_http_health_detect_check_init_shm_zone(ngx_shm_zone_t *shm_zone,
                                            void *data) {
   ngx_slab_pool_t *shpool;
   ngx_http_health_detect_peers_shm_t *peers_shm, *opeers_shm;
-
-  if (peers_manager_ctx == NULL) {
-    return NGX_OK;
-  }
+  size_t len;
+  ngx_uint_t start;
 
   if (data != NULL) {
-    opeers_shm = data;
-
-    peers_manager_ctx->peers_shm = opeers_shm;
-    peers_manager_ctx->peers_shm->shpool = opeers_shm->shpool;
-
     shm_zone->data = data;
 
-    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-                  "init shm zone on %P when reload", ngx_pid);
+    if (peers_manager_ctx == NULL) {
+      return NGX_OK;
+    }
+
+    opeers_shm = data;
+    peers_manager_ctx->peers_shm = opeers_shm;
+    peers_manager_ctx->peers_shm->shpool = opeers_shm->shpool;
+    peers_manager_ctx->peers_shm->max_number =
+        peers_manager_ctx->hdscf->max_check_nums;
+
+    /* 如果reload之前共享内存中探测节点个数已经大于本次允许的最大节点个数，清空reload之前共享内存所有节点
+     */
+    if (peers_manager_ctx->peers_shm->number >
+        peers_manager_ctx->hdscf->max_check_nums) {
+      start = 1;
+      ngx_health_detect_delete_all_node(NULL, &start);
+    }
 
     return NGX_OK;
   }
@@ -615,9 +623,19 @@ ngx_http_health_detect_check_init_shm_zone(ngx_shm_zone_t *shm_zone,
     goto failure;
   }
 
-  peers_shm->number = 0;
+  len = sizeof(" in health detect shared zone \"\"") + shm_zone->shm.name.len;
 
-  peers_shm->max_number = peers_manager_ctx->nhscf->max_check_nums;
+  shpool->log_ctx = ngx_slab_alloc(shpool, len);
+  if (shpool->log_ctx == NULL) {
+    return NGX_ERROR;
+  }
+
+  ngx_sprintf(shpool->log_ctx, " in health detect shared zone \"%V\"%Z",
+              &shm_zone->shm.name);
+  shpool->log_nomem = 0;
+
+  peers_shm->number = 0;
+  peers_shm->max_number = peers_manager_ctx->hdscf->max_check_nums;
 
   ngx_rbtree_init(&peers_shm->rbtree, &peers_shm->sentinel,
                   ngx_http_health_detect_peer_shm_rbtree_insert_value);
@@ -626,6 +644,7 @@ ngx_http_health_detect_check_init_shm_zone(ngx_shm_zone_t *shm_zone,
   peers_manager_ctx->peers_shm->shpool = shpool;
 
   shm_zone->data = peers_manager_ctx->peers_shm;
+
   return NGX_OK;
 
 failure:
@@ -639,10 +658,10 @@ failure:
 static char *ngx_http_health_detect_init_shm(ngx_conf_t *cf,
                                              ngx_str_t *zone_name,
                                              ngx_int_t size) {
-  ngx_http_health_detect_srv_conf_t *nhscf;
+  ngx_http_health_detect_srv_conf_t *hdscf;
   ngx_shm_zone_t *check_zone;
 
-  nhscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_health_detect_module);
+  hdscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_health_detect_module);
 
   check_zone = ngx_shared_memory_add(cf, zone_name, size,
                                      &ngx_http_health_detect_module);
@@ -650,8 +669,8 @@ static char *ngx_http_health_detect_init_shm(ngx_conf_t *cf,
     return NGX_CONF_ERROR;
   }
 
-  nhscf->check_zone = check_zone;
-  nhscf->check_zone->init = ngx_http_health_detect_check_init_shm_zone;
+  hdscf->check_zone = check_zone;
+  hdscf->check_zone->init = ngx_http_health_detect_check_init_shm_zone;
 
   ngx_log_error(NGX_LOG_DEBUG, cf->log, 0,
                 "health_detect srv conf: check_zone name(%V) size(%ui)M",
@@ -665,7 +684,6 @@ static char *ngx_http_health_detect_merge_srv_conf(ngx_conf_t *cf, void *parent,
   ngx_http_health_detect_srv_conf_t *prev = parent;
   ngx_http_health_detect_srv_conf_t *conf = child;
   ngx_str_t name;
-
   ngx_conf_merge_value(conf->enable, prev->enable, 0);
   ngx_conf_merge_uint_value(conf->max_check_nums, prev->max_check_nums,
                             MAX_PEER_NUMS_DEFAULT_VALUE);
@@ -675,6 +693,8 @@ static char *ngx_http_health_detect_merge_srv_conf(ngx_conf_t *cf, void *parent,
   ngx_conf_merge_ptr_value(conf->check_zone, prev->check_zone, NULL);
 
   if (!conf->enable) {
+    peers_manager_ctx = NULL;
+
     ngx_log_error(NGX_LOG_WARN, cf->log, 0,
                   "ngx_http_health_detect_module is not enabled!");
     return NGX_CONF_OK;
@@ -686,7 +706,7 @@ static char *ngx_http_health_detect_merge_srv_conf(ngx_conf_t *cf, void *parent,
     ngx_log_error(NGX_LOG_ERR, cf->log, 0, "malloc global peers manager error");
     return NGX_CONF_ERROR;
   }
-  peers_manager_ctx->nhscf = conf;
+  peers_manager_ctx->hdscf = conf;
 
   ngx_log_error(
       NGX_LOG_DEBUG, cf->log, 0,
@@ -708,17 +728,17 @@ static char *ngx_conf_health_detect_set_max_check_nums(ngx_conf_t *cf,
                                                        void *conf) {
   ngx_str_t *value;
 
-  ngx_http_health_detect_srv_conf_t *nhscf = conf;
+  ngx_http_health_detect_srv_conf_t *hdscf = conf;
 
-  if (nhscf->max_check_nums != NGX_CONF_UNSET_UINT) {
+  if (hdscf->max_check_nums != NGX_CONF_UNSET_UINT) {
     return "is duplicate";
   }
   value = cf->args->elts;
 
-  nhscf->max_check_nums = ngx_atoi(value[1].data, value[1].len);
-  if (nhscf->max_check_nums == (ngx_uint_t)NGX_ERROR ||
-      nhscf->max_check_nums < 1 ||
-      nhscf->max_check_nums > MAX_PEER_NUMS_MAX_VALUE) {
+  hdscf->max_check_nums = ngx_atoi(value[1].data, value[1].len);
+  if (hdscf->max_check_nums == (ngx_uint_t)NGX_ERROR ||
+      hdscf->max_check_nums < 1 ||
+      hdscf->max_check_nums > MAX_PEER_NUMS_MAX_VALUE) {
     ngx_conf_log_error(
         NGX_LOG_EMERG, cf, 0,
         "invalid value \"%s\" in \"%s\" directive, min:%i max: %i",
@@ -733,16 +753,16 @@ static char *ngx_conf_health_detect_set_max_history_status_count(
     ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   ngx_str_t *value;
 
-  ngx_http_health_detect_srv_conf_t *nhscf = conf;
+  ngx_http_health_detect_srv_conf_t *hdscf = conf;
 
-  if (nhscf->max_history_status_count != NGX_CONF_UNSET_SIZE) {
+  if (hdscf->max_history_status_count != NGX_CONF_UNSET_SIZE) {
     return "is duplicate";
   }
   value = cf->args->elts;
 
-  nhscf->max_history_status_count = ngx_atoi(value[1].data, value[1].len);
-  if (nhscf->max_history_status_count == (ngx_uint_t)NGX_ERROR ||
-      nhscf->max_history_status_count > MAX_STATUS_CHANGE_COUNT_MAX_VALUE) {
+  hdscf->max_history_status_count = ngx_atoi(value[1].data, value[1].len);
+  if (hdscf->max_history_status_count == (ngx_uint_t)NGX_ERROR ||
+      hdscf->max_history_status_count > MAX_STATUS_CHANGE_COUNT_MAX_VALUE) {
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                        "invalid value \"%s\" in \"%s\" directive, max: %i",
                        value[1].data, cmd->name.data,
@@ -755,14 +775,14 @@ static char *ngx_conf_health_detect_set_max_history_status_count(
 
 static char *ngx_http_health_detect_check_zone(ngx_conf_t *cf,
                                                ngx_command_t *cmd, void *conf) {
-  ngx_http_health_detect_srv_conf_t *nhscf = conf;
+  ngx_http_health_detect_srv_conf_t *hdscf = conf;
 
   size_t len;
   ngx_int_t n;
   ngx_str_t *value, name, size;
   ngx_uint_t j;
 
-  if (nhscf->check_zone != NGX_CONF_UNSET_PTR) {
+  if (hdscf->check_zone != NGX_CONF_UNSET_PTR) {
     return "is duplicate";
   }
 
@@ -2054,13 +2074,13 @@ static ngx_int_t ngx_health_detect_add_or_update_node_on_shm(
   ngx_rbtree_node_t *node_shm;
   ngx_http_health_detect_peer_shm_t *peer_shm;
   ngx_int_t rc;
-  ngx_http_health_detect_srv_conf_t *nhscf;
+  ngx_http_health_detect_srv_conf_t *hdscf;
 
   if (peers_manager_ctx == NULL) {
     return NGX_ERROR;
   }
 
-  nhscf = peers_manager_ctx->nhscf;
+  hdscf = peers_manager_ctx->hdscf;
 
   peers_shm = peers_manager_ctx->peers_shm;
   shpool = peers_shm->shpool;
@@ -2092,7 +2112,8 @@ static ngx_int_t ngx_health_detect_add_or_update_node_on_shm(
     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
                   "on shm: op(add/update) the number of nodes(%ui) being "
                   "checked exceeds the upper limit(%ui)",
-                  peers_shm->number, nhscf->max_check_nums);
+                  peers_shm->number, hdscf->max_check_nums);
+    ngx_shmtx_unlock(&shpool->mutex);
     return NGX_ERROR;
   }
 
@@ -2154,7 +2175,7 @@ static ngx_int_t ngx_health_detect_add_or_update_node_on_shm(
              ngx_cached_err_log_time.data, ngx_cached_err_log_time.len);
 
   peer_shm->status.latest_status = NGX_CHECK_STATUS_INVALID;
-  peer_shm->status.max_status_count = nhscf->max_history_status_count;
+  peer_shm->status.max_status_count = hdscf->max_history_status_count;
   peer_shm->status.current_status_count = 0;
 
   peer_shm->owner = NGX_INVALID_PID;
@@ -2395,12 +2416,13 @@ static ngx_int_t ngx_health_detect_delete_all_node(ngx_http_request_t *r,
   sentinel = peers_shm->rbtree.sentinel;
   while (node_shm != sentinel) {
     ngx_health_detect_shm_free_node(node_shm);
-    ;
     node_shm = peers_shm->rbtree.root;
   }
   ngx_shmtx_unlock(&peers_shm->shpool->mutex);
 
-  ngx_http_health_detect_clear_peers_events();
+  if (data == NULL || (*(ngx_uint_t *)data == 0)) {
+    ngx_http_health_detect_clear_peers_events();
+  }
 
   return NGX_OK;
 }
@@ -3310,10 +3332,10 @@ ngx_health_detect_prase_request_body(ngx_http_request_t *r, ngx_str_t peer_name,
   ngx_health_detect_detect_policy_t *policy;
   cJSON *attr;
   char *data;
-  ngx_http_health_detect_srv_conf_t *nhscf;
+  ngx_http_health_detect_srv_conf_t *hdscf;
 
-  nhscf = ngx_http_get_module_srv_conf(r, ngx_http_health_detect_module);
-  if (nhscf == NULL) {
+  hdscf = ngx_http_get_module_srv_conf(r, ngx_http_health_detect_module);
+  if (hdscf == NULL) {
     return NULL;
   }
 
@@ -3758,7 +3780,7 @@ static ngx_int_t ngx_http_health_detect_init(ngx_conf_t *cf) {
   ngx_http_handler_pt *h;
   ngx_http_core_main_conf_t *cmcf;
 
-  if (peers_manager_ctx == NULL || peers_manager_ctx->nhscf->enable == 0) {
+  if (peers_manager_ctx == NULL || peers_manager_ctx->hdscf->enable == 0) {
     return NGX_OK;
   }
 
