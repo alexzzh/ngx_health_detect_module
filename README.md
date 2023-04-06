@@ -1,53 +1,54 @@
 # ngx_http_health_detect_module
 
-(English language see [here]())
+(中文版本请参考这里 [here](http://git.koal.com/zhangzhenghao/ngx_http_health_detect_module/-/blob/master/README-zh.md))
 
-> 该模块可以作为通用的后端探测模块，实时探测后端节点健康状态
+> This module can be used as a general health check module to detect the health status of backend nodes in real time
 -----
 
-- 所有后端节点健康状态  
+-  All backend node health status
 ![check_all_node](pic/check_all_node-html.png)
-- 单个后端节点健康状态，历史状态以及探测策略信息
+- One backend node health status, historical status, and detect policy
 ![check_one_node](pic/check_one_node-html.jpg)
 
 
 Table of Contents
 =================
 
-* [描述](#描述)
-* [如何安装](#如何安装)
-* [开发者快速指南](#开发者快速指南)
-* [基本用法](#基本用法)
-* [探测策略各字段解释](#探测策略各字段解释)
-* [restful接口说明](#restful接口说明)
-* [新增nginx指令用法](#新增nginx指令用法)
-* [测试报告](#测试报告)
-* [未完成的工作](#未完成的工作)
-* [项目状态](#项目状态)
-* [错误和补丁](#错误和补丁)
-* [参考链接](#参考链接)
-* [版权和许可](#版权和许可)
+* [Description](#Description)
+* [How to install](#How to install)
+* [Quick Guide for Developers](#Quick Guide for Developers)
+* [Basic usage](#Basic usage)
+* [Detect policy description](#Detect policy description)
+* [Restful api](#Restful api)
+* [Added nginx directive](#Added nginx directive)
+* [Test report](#Test Report)
+* [Todo](#Todo)
+* [Status](#Status)
+* [Bugs and patches](#Bugs and patches)
+* [See also](#See also)
+* [Copyright and License](#Copyright and License)
 
 
-描述
+Description
 ===========
-提供通用的后端探测模块，实时探测后端节点健康状态  
-- 主要特性
-  - 支持四层和七层后端节点的健康检测
-    - 四层支持的检测类型：tcp 
-    - 七层支持的检测类型：http / https
-  - 支持通过restful api`动态`增加/删除后端节点,修改后端节点探测策略以及查询后端节点状态
-  - 支持针对后端节点定制探测策略
-    - 探测类型
-    - 探测间隔以及探测超时时间
-    - 发送内容
-    - 探测失败告警方式
-    - 预期响应值
-    - 是否启用长连接以及长连接存活时间
-  - 支持同时查询所有后端节点当前状态，输出格式: html / json
-  - 支持查询单个后端节点的探测策略以及历史状态，输出格式: html / json
 
-如何安装
+Provides a general health check module to detect the health status of backend nodes in real time 
+- Main features
+  - Supports health detection of Layer 4 and Layer 7 backend nodes
+    - Four-layer supported detection type: TCP 
+    - Seven-layer supported detection type: http / https
+  - Support 'dynamically' adding/removing backend nodes, modifying backend node detection policies, and checking backend node status through Restful API
+  - Support customized detect policies for backend nodes
+    - Detect type
+    - Detect interval and Detect timeout
+    - Send content
+    - Detection failure alarm mode
+    - Expected response value
+    - Long/Short connection and how long connection live
+  - Support checking the current status of all backend nodes at the same time, output format: html / json
+  - Support checking the detection policy and historical status of a one backend node, output format: html / json
+  
+How to install
 ============
 
 ```
@@ -61,18 +62,18 @@ make && make install
 
 [Back to TOC](#table-of-contents)
 
-开发者快速指南
-=====
+Quick Guide for Developers
+==========================
 
-- 类图以及重要成员变量说明
+- Class diagrams and descriptions of important member variables
 ![class](pic/class-1.jpg)
 
 [Back to TOC](#table-of-contents)
 
-基本用法
-=====
+Basic usage
+===========
 
-**nginx.conf 样例** 
+**nginx.conf** 
 ```nginx
 user  root;
 worker_processes  4;
@@ -102,67 +103,68 @@ http {
      }
 }
 ```
-**探测策略各字段解释**
------
+Detect policy description
+==========================
 
-`语法` 
+`Syntax` 
 > {"peer_type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","check_interval":1000,"check_timeout":milliseconds , "need_keepalive": 1|0, "keepalive_time": milliseconds , "rise":count, "fall":count}  
   
-> 只有"peer_type" 和 "peer_addr"是`必选`字段，其他字段不指定时使用默认值
+> Only `peer_type` and `peer_addr` fields are `must` required, other fields use default value if not specified
 
-`默认值`: 
-- 探测类型为tcp
+`Default`: 
+- tcp
 ``` python
  {"send_content":"","alert_method":"log","expect_response_status":"","check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}  
 ```
-- 探测类型为http
+- http
 ``` python
 {"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}
 ```
 
-`详细参数`
-- peer_type: 探测类型
-  - tcp：简单的tcp连接，如果连接成功，就说明后端正常。
-  - http：发送HTTP请求，通过后端的回复包的状态来判断后端是否存活。
-- peer_addr: 探测节点地址
-- send_content： 探测时向后端节点发送内容。
-  - tcp: 忽略该字段。
-  - http：指定http请求具体内容，如果想启用`http keepalive长连接`，需指定发送内容为"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n\"。
-- alert_method： 探测失败时告警方式
-  - log：仅仅是记录探测失败日志。
-  - syslog: 转发错误日志至syslog。 
-- expect_response_status：预期响应值
-  - tcp: 忽略该字段。
-  - http: 指定收到哪些响应视为后端节点状态正常。
-- check_interval：向后端发送的健康检查包的间隔
-- check_timeout: 后端健康请求的超时时间
-- need_keepalive：指定是否启用长连接，如果使用长连接，多次探测会复用同一个连接，反之每次探测都需要新建连接
-  - 长连接比短连接性能更好，但是需要处理连接保活以及持续消耗服务端连接资源问题，不考虑性能的情况下，`推荐`使用短连接。 
-  - 探测类型为http且`send_content`指定使用`http keepalive`时，需要设置长连接。
-  - 探测类型为tcp且与后端节点连接需要经过防火墙，NAT设备时，`不推荐`使用长连接。因为tcp长连接建立后，探活机制使用的是peek函数，此时即便防火墙会拦截请求包，peek仍然成功，直到超过`keepalive_time`，在此期间探测状态可能有误，设置更短的"keepalive_time" 可以降低该问题带来的影响
-- keepalive_time：指定长连接存活时间
-- fall(fall_count): 如果连续失败次数达到fall_count，后端节点就被认为是down。
-- rise(rise_count): 如果连续成功次数达到rise_count，后端节点就被认为是up。
+`Detail`
+- peer_type: detect type
+  - tcp：simple tcp connection, if the connection is successful, it shows the back-end normal.
+  - http：send an HTTP request, by the state of the back-end reply packet to determine whether the back-end survival.
+- peer_addr: detect node address
+- send_content：send content to backend nodes when detecing.
+  - tcp: ignore
+  - http：specify the content of the http request, if you want to enable 'http keepalive', specify the sending content as "GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n".
+- alert_method： alert method when detection fails
+  - log: just log the detect failure.
+  - syslog: forwards error logs to syslog.
+- expect_response_status： the expected response value
+  - tcp: ignore
+  - http: specifies which responses are received to be considered healthy for the backend node.
+- check_interval：the interval of health check packets sent to the backend
+- check_timeout: timeout for backend health requests
+- need_keepalive： specifies whether long connections are enabled, if long connections are used, multiple detection will multiplex the same connection, otherwise each detect requires a new connection
+  - long connections have better performance than short connections, but they need to deal with connection keepalive and continuous consumption of server-side connection resources, and short connections are 'recommended' regardless of performance.  
+  - if the detect type is HTTP and 'send_content' specifies the use of 'HTTP keepalive', long connection needs to be set.
+  - long connections are 'not recommended' when the detect type is tcp and the connection to the backend node needs to go through a firewall, NAT device. Because after the TCP long connection is established, the detection mechanism uses the peek function, at this time, even if the firewall drop the request packet, peek function still succeed until the 'keepalive_time' is exceeded, during which the detect status may be incorrect, and setting a shorter "keepalive_time" can reduce the impact of this problem
+- keepalive_time：specifies the long connection time-to-live
+- fall(fall_count): the server is considered down if the number of consecutive failures reaches fall_count.
+- rise(rise_count): the server is considered up if the number of consecutive successes reaches rise_count.
 
 [Back to TOC](#table-of-contents)
 
-**restful接口说明**
------
-- 增加后端节点
+Restful api
+==========================
+
+- Add detect node
 ``` python
 curl -X POST -i  -H 'Content-Type: application/json'  
   -d "{\"peer_type\":\"http\",\"peer_addr\":\"x.x.x.x:38001\",\"send_content\":\"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n\",\"alert_method\":\"log\",\"expect_response_status\":\"http_2xx\",\"check_interval\":1000,\"check_timeout\":3000, \"need_keepalive\": 1, \"keepalive_time\": 100000, \"rise\":1, \"fall\":2}"  
   server_ip:server_port/add/backend_name
 ```
-- 删除单个后端节点
+- Delete one detect node
 ``` python
 curl -X DELETE server_ip:server_port/delete/backend_name
 ```
-- 删除所有后端节点
+- Delete all detect node 
 ``` python
 curl -X DELETE server_ip:server_port/delete_all
 ```
-- 查询所有后端节点当前状态，输出格式: json
+- Check current status of all detect nodes，format: json
 ```python
 curl http://server_ip:server_port/check_all_status
 {
@@ -180,13 +182,13 @@ curl http://server_ip:server_port/check_all_status
     {"name": "nginx4857","access_time": 2023/04/03 11:10:19, "status": "up"}, 
     {"name": "nginx5664","access_time": 2023/04/03 11:10:18, "status": "up"},
 ```
-- 查询所有后端节点当前状态，输出格式: html
+- Check current status of all detect nodes，format: html
 ```python
 curl http://server_ip:server_port/check_all_status?format=html
 ```
 ![check_all_node](pic/check_all_node-html.png)
  
-- 查询单个后端节点的探测策略以及历史状态，输出格式: json 
+- Check one detect node policy and history status, format: json 
 
 ```python
 http://server_ip:server_port/check_status/nginx8001
@@ -212,7 +214,7 @@ http://server_ip:server_port/check_status/nginx8001
   ]
 }}
 ```
-- 查询单个后端节点的探测策略以及历史状态，输出格式: html 
+- Check one detect node policy and history status, format: html
 ```python
 http://server_ip:server_port/check_status/nginx8001?format=html
 ```
@@ -220,63 +222,64 @@ http://server_ip:server_port/check_status/nginx8001?format=html
 
 [Back to TOC](#table-of-contents)
 
-新增nginx指令用法
+Added nginx directive
 ========
 
 health_detect_enable
 -----
 
-`语法`: health_detect_enable on|off
+`Syntax`: health_detect_enable on|off
 
-`默认值`: health_detect_enable off
+`Default`: health_detect_enable off
 
-`上下文`: http, server
+`Context`: http, server
 
-指定是否开启后端节点健康检查功能。
+Specifies whether to enable ths health detect module.
 
 
 health_detect_max_check_nums
 -----------
 
-`语法`: health_detect_max_check_nums count
+`Syntax`: health_detect_max_check_nums count
 
-`默认值`: health_detect_max_check_nums 20000
+`Default`: health_detect_max_check_nums 20000
 
-`上下文`: http, server
+`Context`: http, server
 
-指定最多能探测多少个后端节点
+Specifies the maximum number of backend nodes that can be detected.
 
 
 health_detect_max_history_status_count
 -----------
 
-`语法`: health_detect_max_history_status_count count
+`Syntax`: health_detect_max_history_status_count count
 
-`默认值`: health_detect_max_history_status_count 10
+`Default`: health_detect_max_history_status_count 10
 
-`上下文`: http, server
+`Context`: http, server
 
-指定记录单个后端节点历史状态变化的次数，采用lru算法记录最近的count个变化以及对应时间戳
+Specify the number of times the historical status of a one backend node is recorded, and use the lru algorithm to record the latest count changes and the corresponding timestamp
 
 
 health_detect_check_zone
 -----------
 
-`语法`: health_detect_check_zone shared:name:size;
+`Syntax`: health_detect_check_zone shared:name:size;
 
-`默认值`: health_detect_check_zone shared:hc:10m
+`Default`: health_detect_check_zone shared:hc:10m
 
-`上下文`: http, server
+`Context`: http, server
 
-指定用于存放后端节点探测策略以及健康状态的共享内存名称以及大小
+Specify the name and size of the shared memory used to hold the backend node delect policy and health status
 
 
 [Back to TOC](#table-of-contents)
 
 
-测试报告
+Test report
 =========
-- 测试环境
+
+- Test env
 ```python
 cat /proc/cpuinfo 
 model name	: Intel(R) Core(TM) i5-6500 CPU @ 3.20GHz
@@ -286,59 +289,60 @@ MemTotal:        7924144 kB
 MemFree:         3156588 kB
 ```
 
-| 后端节点数量 | 探测类型 | 长/短连接 | 探测间隔(s) | 进程数 | CPU单核占比 | 内存占比 |
+| nodes nums | detect type | Long/short connection | detect interval(s) | process | cpu | mem |
 | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
-| 8000 | tcp | 长连接 | 1 | 4 | 5% | 0.4% |
-| 8000 | http | 长连接 | 1 | 4 | 10% | 0.8% |
-| 8000 | tcp | 长连接 | 5 | 4 | 1%-2% | 0.4% |
-| 8000 | http | 长连接 | 5 | 4 | 2%-7% | 0.8% |
-| 8000 | tcp | 短连接 | 1 | 4 | 10% | 0.4% |
-| 8000 | http | 短连接 | 1 | 4 | 20% | 0.8% |
-| 8000 | tcp | 短连接 | 5 | 4 | 3%-5% | 0.4% |
-| 8000 | http | 短连接 | 5 | 4 | 5% | 0.8% |
+| 8000 | tcp | long | 1 | 4 | 5% | 0.4% |
+| 8000 | http | long | 1 | 4 | 10% | 0.8% |
+| 8000 | tcp | long | 5 | 4 | 1%-2% | 0.4% |
+| 8000 | http | long | 5 | 4 | 2%-7% | 0.8% |
+| 8000 | tcp | short | 1 | 4 | 10% | 0.4% |
+| 8000 | http | short | 1 | 4 | 20% | 0.8% |
+| 8000 | tcp | short | 5 | 4 | 3%-5% | 0.4% |
+| 8000 | http | short | 5 | 4 | 5% | 0.8% |
 
 [Back to TOC](#table-of-contents)
 
-
-未完成的工作
+Todo
 =========
 
-- 功能增强
+- Bug fix
+- Feature enhance.
 
 [Back to TOC](#table-of-contents)
 
-项目状态
+Status
 ======
 
-这个项目还在开发中完善中，欢迎贡献代码，或报告bug。一起使它变得更好。  
-有意愿一起开发完善的同学或者有疑问的可以联系我：
+This nginx module is still under development，you are welcome to contribute code, or report bugs. Together to make it better.
+
+If you have any questions, please contact me:
 - `QQ`:122968309
 - `mail`: zzhcore@163.com
 
 [Back to TOC](#table-of-contents)
 
-错误和补丁
+Bugs and Patches
 ================
 
-报告错误
+Please report bugs
 
-- 点击提交[GitHub Issue](https://github.com/alexzzh/ngx_http_health_detect_module/issues),
+- create[GitHub Issue](http://git.koal.com/zhangzhenghao/ngx_http_health_detect_module/-/issues),
 
-提交你的修复补丁
+or submit patches by
 
-- 点击提交[Pull request](https://github.com/alexzzh/ngx_http_health_detect_module/pulls)
+- new [Pull request](http://git.koal.com/zhangzhenghao/ngx_http_health_detect_module/-/merge_requests)
 
 [Back to TOC](#table-of-contents)
 
-参考链接
-=====================
-* ngx_healthcheck_module模块：
+See also
+========
+* ngx_healthcheck_module：
     (<https://github.com/zhouchangxun/ngx_healthcheck_module.git>);
 * nginx: http://nginx.org
 
 [Back to TOC](#table-of-contents)
 
-版权和许可
+Copyright and License
 =====================
     
 This module is licensed under the BSD license.
