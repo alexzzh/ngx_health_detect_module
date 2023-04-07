@@ -317,10 +317,8 @@ struct ngx_http_health_detect_peers_s {
 typedef struct {
   ngx_event_t reload_timer_ev;
 
-  ngx_http_health_detect_peers_t *peers; /*ngx_http_health_detect_peer_t*/
-
-  ngx_http_health_detect_peers_shm_t
-      *peers_shm; /* ngx_http_health_detect_peer_shm_t */
+  ngx_http_health_detect_peers_t *peers;
+  ngx_http_health_detect_peers_shm_t *peers_shm;
 
   ngx_http_health_detect_srv_conf_t *hdscf;
 } ngx_http_health_detect_peers_manager_t;
@@ -443,27 +441,35 @@ ngx_health_detect_get_policy_alert_method_to_string(ngx_uint_t type) {
 
 static ngx_health_detect_default_detect_policy_t
     ngx_health_detect_default_detect_policy[] = {
-
-        {NGX_HTTP_CHECK_TCP, ngx_string("tcp"), ngx_null_string, 0,
+        {
+         NGX_HTTP_CHECK_TCP, ngx_string("tcp"), ngx_null_string, 0,
          ngx_string("log"), 1, 2, ngx_http_health_detect_peek_handler,
          ngx_http_health_detect_peek_handler, NULL, NULL, NULL, 0, 0, 100000,
-         1000, 3000},
-        {NGX_HTTP_CHECK_HTTP, ngx_string("http"),
+         1000, 3000
+        },
+        {
+          NGX_HTTP_CHECK_HTTP, ngx_string("http"),
          ngx_string("GET / HTTP/1.0\r\n\r\n"),
          NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
          ngx_string("log"), 1, 2, ngx_http_health_detect_send_handler,
          ngx_http_health_detect_recv_handler, ngx_http_health_detect_http_init,
          ngx_http_health_detect_http_parse, ngx_http_health_detect_http_reinit,
-         1, 0, 100000, 1000, 3000},
-        {NGX_HTTP_CHECK_SSL_HELLO, ngx_string("https"),
+         1, 0, 100000, 1000, 3000
+        },
+        {
+         NGX_HTTP_CHECK_SSL_HELLO, ngx_string("https"),
          ngx_string(sslv3_client_hello_pkt), 0, ngx_string("log"), 1, 2,
          ngx_http_health_detect_send_handler,
          ngx_http_health_detect_recv_handler,
          ngx_http_health_detect_ssl_hello_init,
          ngx_http_health_detect_ssl_hello_parse,
-         ngx_http_health_detect_ssl_hello_reinit, 1, 0, 0, 1000, 3000},
-        {0, ngx_null_string, ngx_null_string, 0, ngx_null_string, 0, 0, NULL,
-         NULL, NULL, NULL, NULL, 0, 0, 0, 1000, 3000}};
+         ngx_http_health_detect_ssl_hello_reinit, 1, 0, 0, 1000, 3000
+        },
+        {
+         0, ngx_null_string, ngx_null_string, 0, ngx_null_string, 0, 0,
+         NULL,NULL, NULL, NULL, NULL, 0, 0, 0, 1000, 3000
+        }
+};
 
 #define NGX_PRASE_REQ_OK 0
 #define NGX_PRASE_REQ_ERR -1
@@ -482,21 +488,41 @@ static ngx_health_detect_default_detect_policy_t
 #define NGX_PRASE_REQ_INVALID_KEEPALIVE_TIME -14
 
 static ngx_http_health_detect_status_format_ctx_t ngx_check_status_formats[] = {
-    {ngx_string("json"), ngx_string("application/json"),
+    {
+     ngx_string("json"), ngx_string("application/json"),
      ngx_http_health_detect_status_json_format,
-     ngx_http_health_detect_all_status_json_format},
-    {ngx_string("html"), ngx_string("text/html"),
+     ngx_http_health_detect_all_status_json_format
+    },
+    {
+     ngx_string("html"), ngx_string("text/html"),
      ngx_http_health_detect_status_html_format,
-     ngx_http_health_detect_all_status_html_format},
-    {ngx_null_string, ngx_null_string, NULL, NULL}};
+     ngx_http_health_detect_all_status_html_format
+    },
+    {
+     ngx_null_string, ngx_null_string, NULL, NULL
+    }
+};
 
 static ngx_conf_bitmask_t ngx_check_http_expect_alive_masks[] = {
-    {ngx_string("http_2xx"), NGX_CHECK_HTTP_2XX},
-    {ngx_string("http_3xx"), NGX_CHECK_HTTP_3XX},
-    {ngx_string("http_4xx"), NGX_CHECK_HTTP_4XX},
-    {ngx_string("http_5xx"), NGX_CHECK_HTTP_5XX},
-    {ngx_string("http_err"), NGX_CHECK_HTTP_ERR},
-    {ngx_null_string, 0}};
+    {
+     ngx_string("http_2xx"), NGX_CHECK_HTTP_2XX
+    },
+    {
+     ngx_string("http_3xx"), NGX_CHECK_HTTP_3XX
+    },
+    {
+     ngx_string("http_4xx"), NGX_CHECK_HTTP_4XX
+    },
+    {
+     ngx_string("http_5xx"), NGX_CHECK_HTTP_5XX
+    },
+    {
+     ngx_string("http_err"), NGX_CHECK_HTTP_ERR
+    },
+    {
+     ngx_null_string, 0
+    }
+};
 
 #define ADD_PEER 1
 #define UPDATE_PEER 2
@@ -512,35 +538,58 @@ typedef struct support_op_s {
 } support_op_t;
 
 static support_op_t api_route[] = {
-    {ADD_PEER, ngx_string("/add/"), ngx_health_detect_add_or_update_node},
-    {UPDATE_PEER, ngx_string("/update/"), ngx_health_detect_add_or_update_node},
-    {DELETE_PEER, ngx_string("/delete/"), ngx_health_detect_delete_node},
-    {DELETE_ALL_PEERS, ngx_string("/delete_all"),
-     ngx_health_detect_delete_all_node},
-    {CHECK_ONE_PEER_STATUS, ngx_string("/check_status/"),
-     ngx_health_detect_check_node_status},
-    {CHECK_ALL_PEER_STATUS_OP, ngx_string("/check_all_status"),
-     ngx_health_detect_check_all_node_status},
-    {0, ngx_null_string, NULL}};
+    {
+     ADD_PEER, ngx_string("/add/"),
+     ngx_health_detect_add_or_update_node
+    },
+    {
+     UPDATE_PEER, ngx_string("/update/"),
+     ngx_health_detect_add_or_update_node
+    },
+    {
+     DELETE_PEER, ngx_string("/delete/"),
+     ngx_health_detect_delete_node
+    },
+    {
+     DELETE_ALL_PEERS, ngx_string("/delete_all"),
+     ngx_health_detect_delete_all_node
+    },
+    {
+     CHECK_ONE_PEER_STATUS, ngx_string("/check_status/"),
+     ngx_health_detect_check_node_status
+    },
+    {
+     CHECK_ALL_PEER_STATUS_OP, ngx_string("/check_all_status"),
+     ngx_health_detect_check_all_node_status
+    },
+    {0, ngx_null_string, NULL}
+};
 
 static ngx_command_t ngx_http_health_detect_cmds[] = {
-    {ngx_string("health_detect_enable"),
+    {
+     ngx_string("health_detect_enable"),
      NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot, NGX_HTTP_SRV_CONF_OFFSET,
-     offsetof(ngx_http_health_detect_srv_conf_t, enable), NULL},
-    {ngx_string("health_detect_max_check_nums"),
+     offsetof(ngx_http_health_detect_srv_conf_t, enable), NULL
+    },
+    {
+     ngx_string("health_detect_max_check_nums"),
      NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-     ngx_conf_health_detect_set_max_check_nums, NGX_HTTP_SRV_CONF_OFFSET, 0,
-     NULL},
-    {ngx_string("health_detect_max_history_status_count"),
+     ngx_conf_health_detect_set_max_check_nums, NGX_HTTP_SRV_CONF_OFFSET, 0,NULL
+    },
+    {
+     ngx_string("health_detect_max_history_status_count"),
      NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
      ngx_conf_health_detect_set_max_history_status_count,
-     NGX_HTTP_SRV_CONF_OFFSET, 0, NULL},
-
-    {ngx_string("health_detect_check_zone"),
+     NGX_HTTP_SRV_CONF_OFFSET, 0, NULL
+    },
+    {
+     ngx_string("health_detect_check_zone"),
      NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-     ngx_http_health_detect_check_zone, NGX_HTTP_SRV_CONF_OFFSET, 0, NULL},
-    ngx_null_command};
+     ngx_http_health_detect_check_zone, NGX_HTTP_SRV_CONF_OFFSET, 0, NULL
+    },
+    ngx_null_command
+};
 
 static ngx_http_module_t ngx_http_health_detect_modules_ctx = {
     NULL,
@@ -604,8 +653,7 @@ ngx_http_health_detect_check_init_shm_zone(ngx_shm_zone_t *shm_zone,
     peers_manager_ctx->peers_shm->max_number =
         peers_manager_ctx->hdscf->max_check_nums;
 
-    /* 如果reload之前共享内存中探测节点个数已经大于本次允许的最大节点个数，清空reload之前共享内存所有节点
-     */
+    /* clear all nodes on old zone if new "max_check_nums" value less than nodes counts on old zone */
     if (peers_manager_ctx->peers_shm->number >
         peers_manager_ctx->hdscf->max_check_nums) {
       start = 1;
@@ -962,7 +1010,6 @@ static void ngx_http_health_detect_recv_handler(ngx_event_t *event) {
   ctx = peer->check_data;
 
   if (ctx->recv.start == NULL) {
-    // c's pool is peer's pool, so can be reuse again on next connection
     ctx->recv.start = ngx_palloc(c->pool, ngx_pagesize / 2);
     if (ctx->recv.start == NULL) {
       goto check_recv_fail;
@@ -1022,7 +1069,7 @@ static void ngx_http_health_detect_recv_handler(ngx_event_t *event) {
   switch (rc) {
 
   case NGX_AGAIN:
-    // The peer has closed its half side of the connection.
+    /* The peer has closed its half side of the connection */
     if (size == 0) {
       rc = ngx_http_health_detect_status_update(node, NGX_CHECK_STATUS_DOWN);
       c->error = 1;
@@ -1675,7 +1722,6 @@ ngx_http_health_detect_ssl_hello_init(ngx_http_health_detect_peer_t *peer) {
   return NGX_OK;
 }
 
-// a rough check of server ssl_hello responses
 static ngx_int_t
 ngx_http_health_detect_ssl_hello_parse(ngx_http_health_detect_peer_t *peer) {
   size_t size;
@@ -3369,22 +3415,21 @@ ngx_health_detect_prase_request_body(ngx_http_request_t *r, ngx_str_t peer_name,
   } else {
     /*
      * attrs :
-     *   must:
-     *      type             ngx_str_t
-     *      peer_name        ngx_str_t
-     *      peer_addr        ngx_str_t
+     * must:
+     * type  ngx_str_t
+     * peer_name  ngx_str_t
+     * peer_addr  ngx_str_t
      *
-     *   option:
-     *      send_content            ngx_str_t       empty means use default
-     * value alert_method            ngx_str_t       empty means use default
-     * value expect_response_status  ngx_str_t       empty means use default
-     * value check_interval          ngx_msec_int_t  empty means use default
-     * value check_timeout           ngx_msec_int_t  empty means use default
-     * value rise                    ngx_uint_t      empty means use default
-     * value fall                    ngx_uint_t      empty means use default
-     * value need_keepalive          ngx_uint_t      empty means use default
-     * value keepalive_time          ngx_msec_int_t  empty means use default
-     * value
+     * option:
+     * send_content  ngx_str_t  empty means use default value
+     * alert_method  ngx_str_t  empty means use default value
+     * expect_response_status  ngx_str_t  empty means use default value
+     * check_interval  ngx_msec_int_t  empty means use default value
+     * check_timeout  ngx_msec_int_t  empty means use default value
+     * rise  ngx_uint_t  empty means use default value
+     * fall  ngx_uint_t  empty means use default value
+     * need_keepalive  ngx_uint_t  empty means use default value
+     * keepalive_time  ngx_msec_int_t  empty means use default value
      * */
     policy = ngx_pcalloc(r->pool, sizeof(ngx_health_detect_detect_policy_t));
 
