@@ -10,24 +10,22 @@
 - One backend node health status, historical status, and detect policy
 ![check_one_node](pic/check_one_node-html.jpg)
 
-
 Table of Contents
 =================
 
-* [Description](#Description)
-* [How to install](#How to install)
-* [Quick Guide for Developers](#Quick Guide for Developers)
-* [Basic usage](#Basic usage)
-* [Detect policy description](#Detect policy description)
-* [Restful api](#Restful api)
-* [Added nginx directive](#Added nginx directive)
-* [Test report](#Test Report)
-* [Todo](#Todo)
-* [Status](#Status)
-* [Bugs and patches](#Bugs and patches)
-* [See also](#See also)
-* [Copyright and License](#Copyright and License)
-
+* [Description](#description)
+* [How to install](#how-to-install)
+* [Quick Guide for Developers](#1uick-guide-for-developers)
+* [Basic usage](#basic-usage)
+* [Detect policy description](#detect-policy-description)
+* [Restful api](#restful-api)
+* [Added nginx directive](#added-nginx-directive)
+* [Test report](#test-report)
+* [Todo](#todo)
+* [Status](#status)
+* [Bugs and patches](#bugs-and-patches)
+* [See also](#see-also)
+* [Copyright and License](#copyright-and-license)
 
 Description
 ===========
@@ -49,7 +47,7 @@ Provides a general health check module to detect the health status of backend no
   - Support checking the detection policy and historical status of a one backend node, output format: html / json
   
 How to install
-============
+==============
 
 ```
 git clone https://github.com/nginx/nginx.git
@@ -104,7 +102,7 @@ http {
 }
 ```
 Detect policy description
-==========================
+=========================
 
 `Syntax` 
 > {"peer_type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","check_interval":1000,"check_timeout":milliseconds , "need_keepalive": 1|0, "keepalive_time": milliseconds , "rise":count, "fall":count}  
@@ -148,7 +146,7 @@ Detect policy description
 [Back to TOC](#table-of-contents)
 
 Restful api
-==========================
+===========
 
 - Add detect node
 ``` python
@@ -277,7 +275,7 @@ Specify the name and size of the shared memory used to hold the backend node del
 
 
 Test report
-=========
+===========
 
 - Test env
 ```python
@@ -303,7 +301,7 @@ MemFree:         3156588 kB
 [Back to TOC](#table-of-contents)
 
 Todo
-=========
+====
 
 - Bug fix
 - Feature enhance.
