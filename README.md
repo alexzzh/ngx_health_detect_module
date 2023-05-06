@@ -1,6 +1,6 @@
 # ngx_health_detect_module
 
-(English language see [here](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README-en.md))
+(English language see [here]([http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README-en.md](https://github.com/alexzzh/ngx_health_detect_module/blob/master/README-en.md)))
 
 > 该模块可以提供主动式后端节点健康检查的功能，后端节点可以是Nginx upstream负载节点，在解析upstream配置时自动注册，保证新的请求直接发送到一个健康的后端节点，也可以通过Restful API动态注册后端节点，以便实时查看节点健康状态
 -----
@@ -331,7 +331,7 @@ health_detect_check
 
 `上下文`: http/upstream, stream/upstream
 
-通过在http或stream下的upstream配置块中添加该指令来开启对该upstream中的后端节点的健康检查，各字段解释同[探测策略各字段解释](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/tree/master#%E6%8E%A2%E6%B5%8B%E7%AD%96%E7%95%A5%E5%90%84%E5%AD%97%E6%AE%B5%E8%A7%A3%E9%87%8A)
+通过在http或stream下的upstream配置块中添加该指令来开启对该upstream中的后端节点的健康检查，各字段解释同[探测策略各字段解释](https://github.com/alexzzh/ngx_health_detect_module#%E6%8E%A2%E6%B5%8B%E7%AD%96%E7%95%A5%E5%90%84%E5%AD%97%E6%AE%B5%E8%A7%A3%E9%87%8A)
 
 
 health_detect_http_expect_alive
