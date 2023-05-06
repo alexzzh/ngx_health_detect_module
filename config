@@ -1,10 +1,39 @@
-ngx_module_type=HTTP
-ngx_module_name=ngx_http_health_detect_module
+#module config script
 
-ngx_module_srcs="$ngx_addon_dir/ngx_http_health_detect_module.c \
-                 $ngx_addon_dir/cJSON.c
-                "
-ngx_module_deps="$ngx_addon_dir/cJSON.h
-                "
-ngx_addon_name=$ngx_module_name
-. auto/module
+ngx_addon_name=ngx_health_detect_module
+ngx_feature_path="$ngx_addon_dir"
+ngx_feature_deps="$ngx_addon_dir/ngx_http_health_detect_module.h \
+                  $ngx_addon_dir/ngx_stream_health_detect_module.h \
+                  $ngx_addon_dir/ngx_health_detect_common.h  \
+                  $ngx_addon_dir/ngx_health_detect_utils.h \
+                  $ngx_addon_dir/cJSON.h "
+ngx_feature_src="$ngx_addon_dir/ngx_health_detect_api.c \
+                 $ngx_addon_dir/ngx_http_health_detect_module.c \
+                 $ngx_addon_dir/ngx_stream_health_detect_module.c \
+                 $ngx_addon_dir/ngx_health_detect_utils.c \
+                 $ngx_addon_dir/cJSON.c \
+                 $ngx_addon_dir/ngx_health_detect_common.c "
+
+have=NGX_HTTP_HEALTH_DETECT  . auto/have
+have=NGX_STREAM_HEALTH_DETECT . auto/have
+
+if [ "$ngx_module_link" = DYNAMIC ]; then
+  echo "[ERROR] ngx_health_detect_module do not support dynamic loading yet.";exit 1
+  #first module name as main module name.
+  ngx_module_name="ngx_health_detect_api_module \
+                   ngx_http_health_detect_module \
+                   ngx_stream_health_detect_module "
+  ngx_module_incs="$ngx_feature_path"
+  ngx_module_srcs="$ngx_feature_src"
+  ngx_module_deps="$ngx_feature_deps"
+  ngx_module_libs=
+
+  . auto/module
+else
+  HTTP_MODULES="$HTTP_MODULES ngx_health_detect_api_module"
+  HTTP_MODULES="$HTTP_MODULES ngx_http_health_detect_module"
+  STREAM_MODULES="$STREAM_MODULES ngx_stream_health_detect_module"
+  CORE_INCS="$CORE_INCS $ngx_feature_path"
+  NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_feature_deps"
+  NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_feature_src"
+fi

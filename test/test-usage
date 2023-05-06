@@ -1,0 +1,9 @@
+        script usage: ./test api_type(http_api|tcp_api) cmd(add/delete/delete_all/status)  check_type(http|tcp)  need_keepalive(0|1) start_seq  end_seq
+         eg:
+	 ------------------------------------------------------------------------------
+		        api_type     cmd          check_type  need_keepalive start_seq  end_seq
+		 ./test http_api     add          http        0              1          4000
+		 ./test http_api     delete                                  1          2000
+		 ./test http_api     delete_all 
+		 ./test http_api     status_all    	
+     ------------------------------------------------------------------------------
