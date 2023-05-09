@@ -6,6 +6,7 @@ server=10.0.229.99:641
 http_location="http_api"
 tcp_location="tcp_api"
 
+set -x
 
 cat ./test-usage
 
@@ -28,9 +29,9 @@ if [ $2 = "add" ]; then
 	fi 
 
 	if [ $4 -eq 0 ]; then
-		need_keepalive=0
+		keepalive=0
 	elif [ $4 -eq 1 ]; then
-		need_keepalive=1
+		keepalive=1
 	else
 		exit 1 
 	fi 
@@ -57,30 +58,30 @@ if [ $cmd = "add" ];then
 	 
 	if [ $api_type = "http_status" ]; then
 		if [ $check_type = "http" ]; then
-			if [ $need_keepalive -eq 1 ]; then
-			    curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 1, \"keepalive_time\": 200000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+			if [ $keepalive -eq 1 ]; then
+			    curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"true\", \"keepalive_time\": 200000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			else
-				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 0, \"keepalive_time\": 100000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"false\", \"keepalive_time\": 100000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			fi 
 		else
-			if [ $need_keepalive -eq 1 ]; then
-				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 1, \"keepalive_time\": 200000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+			if [ $keepalive -eq 1 ]; then
+				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"true\", \"keepalive_time\": 200000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			else
-				curl  -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 0, \"keepalive_time\": 100000, \"rise\":1, \"fall\":2}" $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+				curl  -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"false\", \"keepalive_time\": 100000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}" $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			fi 
 		fi  
 	else
 		if [ $check_type = "http" ]; then
-			if [ $need_keepalive -eq 1 ]; then
-			    curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 1, \"keepalive_time\": 200000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+			if [ $keepalive -eq 1 ]; then
+			    curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"true\", \"keepalive_time\": 200000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			else
-				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 0, \"keepalive_time\": 100000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"http\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"false\", \"keepalive_time\": 100000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			fi 
 		else
-			if [ $need_keepalive -eq 1 ]; then
-				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 1, \"keepalive_time\": 200000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+			if [ $keepalive -eq 1 ]; then
+				curl -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"true\", \"keepalive_time\": 200000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			else
-				curl  -X POST -i  -H 'Content-Type: application/json'  -d "{\"peer_type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"check_interval\":5000,\"check_timeout\":3000, \"need_keepalive\": 0, \"keepalive_time\": 100000, \"rise\":1, \"fall\":2}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
+				curl  -X POST -i  -H 'Content-Type: application/json'  -d "{\"type\":\"tcp\",\"peer_addr\":\"10.0.229.100:$seq\",\"send_content\":\"\",\"alert_method\":\"log\",\"expect_response\":\"http_2xx\",\"interval\":5000,\"timeout\":3000, \"keepalive\": \"false\", \"keepalive_time\": 100000, \"rise\":1, \"fall\":2, \"default_down\":\"false\"}"  $server/$api_type/control\?cmd=$cmd\&name=nginx${k}
 			fi 
 		fi 
 	fi 

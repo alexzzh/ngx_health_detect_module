@@ -35,7 +35,6 @@
 
 #define NGX_CHECK_STATUS_DOWN 0x0001
 #define NGX_CHECK_STATUS_UP 0x0002
-#define NGX_CHECK_STATUS_INVALID 0x0003
 
 #define NGX_CHECK_HTTP_2XX 0x0002
 #define NGX_CHECK_HTTP_3XX 0x0004
@@ -78,6 +77,10 @@ typedef struct {
 
     ngx_uint_t need_keepalive;
     ngx_msec_t keepalive_time;
+
+    /* just avoid no live upstream server when upstream server's domain ip
+     * change */
+    ngx_uint_t from_upstream;
 } ngx_health_detect_policy_data_t;
 
 typedef struct {
@@ -102,6 +105,10 @@ typedef struct {
     ngx_msec_t access_time;
     ngx_uint_t fall_count;
     ngx_uint_t rise_count;
+
+    ngx_uint_t fast_check_count;
+
+    ngx_int_t ref;
 } ngx_health_detect_peer_shm_t;
 
 typedef struct {
