@@ -1,6 +1,6 @@
 # ngx_health_detect_module
 
-(中文版本请参考这里 [here](https://github.com/alexzzh/ngx_health_detect_module/blob/master/README.md))
+(中文版本请参考这里 [here](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README.md))
 
 > This module provides proactive health detect for back-end node, the back-end node can be Nginx upstream servers (support http upstream && stream upstream) which added when parsing upstream config or added by dynamic restful APIs
 -----
@@ -59,8 +59,10 @@ How to install
 git clone https://github.com/nginx/nginx.git
 git clone http://git.koal.com/zhangzhenghao/ngx_health_detect_module
 cd nginx/;
-git checkout branches/stable-xxx
-git apply ../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_xxx+.patch
+git checkout branches/release-1.12.0
+
+//apply patch or add patch manually
+git apply ../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_1.12+.patch
 
 ./auto/configure --add-module=../ngx_health_detect_module/
 make && make install
@@ -140,22 +142,22 @@ Detect policy description
 - no matter back-end node added by upstream config or restful api , the policy is same  
 
 `Syntax` 
-> {"peer_type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","check_interval":1000,"check_timeout":milliseconds , "need_keepalive": 1|0, "keepalive_time": milliseconds , "rise":count, "fall":count}  
+> {"type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","interval":milliseconds,"timeout":milliseconds , "keepalive": "true"|"false", "keepalive_time": milliseconds , "rise":count, "fall":count, "default_down": "true"|"false"}
   
 > Only `peer_type` and `peer_addr` fields are `must` required, other fields use default value if not specified
 
 `Default`: 
 - tcp
 ``` python
- {"send_content":"","alert_method":"log","expect_response_status":"","check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}  
+ {"send_content":"","alert_method":"log","expect_response_status":"","interval":30000,"timeout":3000 , "keepalive": "false", "keepalive_time": 3600000 , "rise":1, "fall":2, "default_down":"false"}
 ```
 - http
 ``` python
-{"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}
+{"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"interval":30000,"timeout":3000 , "keepalive": "true", "keepalive_time": 3600000 , "rise":1, "fall":2, "default_down":"false"}
 ```
 
 `Detail`
-- peer_type: detect type
+- type: detect type
   - tcp：simple tcp connection, if the connection is successful, it shows the back-end normal.
   - http：send an HTTP request, by the state of the back-end reply packet to determine whether the back-end survival.
 - peer_addr: detect node address
@@ -168,15 +170,16 @@ Detect policy description
 - expect_response_status： the expected response value
   - tcp: ignore
   - http: specifies which responses are received to be considered healthy for the backend node.
-- check_interval：the interval of health check packets sent to the backend
-- check_timeout: timeout for backend health requests
-- need_keepalive： specifies whether long connections are enabled, if long connections are used, multiple detection will multiplex the same connection, otherwise each detect requires a new connection
+- interval：the interval of health check packets sent to the backend
+- timeout: timeout for backend health requests
+- keepalive： specifies whether long connections are enabled, if long connections are used, multiple detection will multiplex the same connection, otherwise each detect requires a new connection
   - long connections have better performance than short connections, but they need to deal with connection keepalive and continuous consumption of server-side connection resources, and short connections are 'recommended' regardless of performance.  
   - if the detect type is HTTP and 'send_content' specifies the use of 'HTTP keepalive', long connection needs to be set.
   - long connections are 'not recommended' when the detect type is tcp and the connection to the backend node needs to go through a firewall, NAT device. Because after the TCP long connection is established, the detection mechanism uses the peek function, at this time, even if the firewall drop the request packet, peek function still succeed until the 'keepalive_time' is exceeded, during which the detect status may be incorrect, and setting a shorter "keepalive_time" can reduce the impact of this problem
 - keepalive_time：specifies the long connection time-to-live
 - fall(fall_count): the server is considered down if the number of consecutive failures reaches fall_count.
 - rise(rise_count): the server is considered up if the number of consecutive successes reaches rise_count.
+- default_down : specify default status when add new detect node.
 
 [Back to TOC](#table-of-contents)
 
@@ -308,11 +311,11 @@ health_detect_check
 
 `Syntax`: health_detect_check type=http|tcp [alert_method=log|syslog] [interval=milliseconds] [timeout=milliseconds] [rise=count] [fall=count] [default_down=true|false][keepalive=true|false] [keepalive_time=milliseconds]; 
 
-`Default`: health_detect_check type=tcp alert_method=log interval=30000 timeout=5000 rise=1 fall=2 default_down=true keepalive=false keepalive_time=3600000;
+`Default`: health_detect_check type=tcp alert_method=log interval=30000 timeout=5000 rise=1 fall=2 default_down=false keepalive=false keepalive_time=3600000;
 
 `Context`: http/upstream, stream/upstream
 
-Specify whether to enable the health detect in this upstream, all fields are explained same as [Detect policy description](https://github.com/alexzzh/ngx_health_detect_module/blob/master/README-en.md#detect-policy-description)
+Specify whether to enable the health detect in this upstream, all fields are explained same as [Detect policy description](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README-en.md#detect-policy-description)
 
 
 health_detect_http_expect_alive
@@ -391,11 +394,11 @@ Bugs and Patches
 
 Please report bugs
 
-- create[GitHub Issue](https://github.com/alexzzh/ngx_health_detect_module/issues),
+- create[GitHub Issue](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/issues),
 
 or submit patches by
 
-- new [Pull request](https://github.com/alexzzh/ngx_health_detect_module/pulls)
+- new [Pull request](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/merge_requests)
 
 [Back to TOC](#table-of-contents)
 

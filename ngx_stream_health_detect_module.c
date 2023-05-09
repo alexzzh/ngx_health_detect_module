@@ -98,23 +98,23 @@ static ngx_health_detect_default_detect_policy_t
         {NGX_HTTP_CHECK_TCP, ngx_string("tcp"), ngx_null_string, 0,
             ngx_string("log"), 1, 2, ngx_stream_health_detect_peek_handler,
             ngx_stream_health_detect_peek_handler, NULL, NULL, NULL, 0, 0,
-            100000, 1000, 3000},
+            3600000, 30000, 3000},
         {NGX_HTTP_CHECK_HTTP, ngx_string("http"),
             ngx_string("GET / HTTP/1.0\r\n\r\n"),
             NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
             ngx_string("log"), 1, 2, ngx_stream_health_detect_send_handler,
             ngx_stream_health_detect_recv_handler,
             ngx_http_health_detect_http_init, ngx_http_health_detect_http_parse,
-            ngx_http_health_detect_http_reinit, 1, 0, 100000, 1000, 3000},
+            ngx_http_health_detect_http_reinit, 1, 1, 3600000, 30000, 3000},
         {NGX_HTTP_CHECK_SSL_HELLO, ngx_string("https"),
             ngx_string(ngx_http_health_sslv3_client_hello_pkt), 0,
             ngx_string("log"), 1, 2, ngx_stream_health_detect_send_handler,
             ngx_stream_health_detect_recv_handler,
             ngx_http_health_detect_ssl_hello_init,
             ngx_http_health_detect_ssl_hello_parse,
-            ngx_http_health_detect_ssl_hello_reinit, 1, 0, 0, 1000, 3000},
+            ngx_http_health_detect_ssl_hello_reinit, 1, 0, 0, 30000, 3000},
         {0, ngx_null_string, ngx_null_string, 0, ngx_null_string, 0, 0, NULL,
-            NULL, NULL, NULL, NULL, 0, 0, 0, 1000, 3000}};
+            NULL, NULL, NULL, NULL, 0, 0, 0, 30000, 3000}};
 
 static ngx_command_t ngx_stream_health_detect_cmds[] = {
     {ngx_string("health_detect_check"), NGX_STREAM_UPS_CONF | NGX_CONF_1MORE,
@@ -237,7 +237,7 @@ ngx_stream_health_detect_upstream_check(
     ngx_stream_health_detect_srv_conf_t *hdscf;
     ngx_uint_t default_down;
 
-    default_down = 1;
+    default_down = 0;
     value = cf->args->elts;
 
     hdscf = ngx_stream_conf_get_module_srv_conf(
@@ -1105,10 +1105,25 @@ ngx_stream_health_detect_shm_free_node(ngx_rbtree_node_t *node)
     ngx_health_detect_one_peer_status *status;
     ngx_health_detect_peer_shm_t *peer_shm;
 
+    peer_shm = (ngx_health_detect_peer_shm_t *) &node->color;
+    if (peer_shm->policy.data.from_upstream) {
+        peer_shm->ref--;
+
+        if (peer_shm->ref > 0) {
+            ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+                "on free shm node: peer name:%V ref(%ui) not zero, so do not "
+                "delete this node",
+                &peer_shm->policy.peer_name, peer_shm->ref);
+            return;
+        }
+    }
+
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+        "on free shm node: peer name:%V ref(%ui) is zero, so delete this node",
+        &peer_shm->policy.peer_name, peer_shm->ref);
+
     peers_shm = peers_manager_ctx->peers_shm;
     shpool = peers_shm->shpool;
-
-    peer_shm = (ngx_health_detect_peer_shm_t *) &node->color;
 
     if (peer_shm->policy.peer_name.data != NULL) {
         ngx_slab_free_locked(shpool, peer_shm->policy.peer_name.data);
@@ -1170,11 +1185,14 @@ ngx_stream_health_detect_add_or_update_node_on_shm(
     if (node_shm != NULL) {
         peer_shm = (ngx_health_detect_peer_shm_t *) &node_shm->color;
         if (peer_shm->policy.checksum == policy->checksum) {
-            ngx_shmtx_unlock(&shpool->mutex);
+            if (policy->data.from_upstream) {
+                peer_shm->ref++;
+            }
             ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
                 "on shm: op(add/update) node peer name(%V) already exist and "
-                "policy is same, so do nothing",
-                &policy->peer_name);
+                "policy is same, just add ref(%ui)",
+                &policy->peer_name, peer_shm->ref);
+            ngx_shmtx_unlock(&shpool->mutex);
             return NGX_OK;
         }
 
@@ -1207,6 +1225,11 @@ ngx_stream_health_detect_add_or_update_node_on_shm(
 
     peer_shm->policy.data = policy->data;
     peer_shm->policy.checksum = policy->checksum;
+
+    if (peer_shm->policy.data.from_upstream) {
+        peer_shm->ref++;
+    }
+
     rc = ngx_parse_addr_port_on_slab_pool_locked(shpool,
         &peer_shm->policy.peer_addr, policy->peer_addr.name.data,
         policy->peer_addr.name.len);
@@ -1256,7 +1279,6 @@ ngx_stream_health_detect_add_or_update_node_on_shm(
     ngx_memcpy(peer_shm->status.latest_access_time.data,
         ngx_cached_err_log_time.data, ngx_cached_err_log_time.len);
 
-    peer_shm->status.latest_status = NGX_CHECK_STATUS_INVALID;
     peer_shm->status.max_status_count = hdmcf->max_history_status_count;
     peer_shm->status.current_status_count = 0;
 
@@ -1268,8 +1290,8 @@ ngx_stream_health_detect_add_or_update_node_on_shm(
     ngx_shmtx_unlock(&shpool->mutex);
 
     ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-        "on shm: op(add/update) add node peer name(%V) peer addr(%V)",
-        &policy->peer_name, &policy->peer_addr.name);
+        "on shm: op(add/update) add node peer name(%V) peer addr(%V) ref(%ui)",
+        &policy->peer_name, &policy->peer_addr.name, peer_shm->ref);
     return NGX_OK;
 
 failed:
@@ -1476,8 +1498,6 @@ ngx_stream_health_detect_delete_node(ngx_str_t *key)
     ngx_shmtx_lock(&shpool->mutex);
     node_shm = ngx_stream_health_detect_peers_shm_rbtree_lookup(hash, key);
     if (node_shm != NULL) {
-        ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-            "on shm: op(delete) node key:%V found, delete this node", key);
         ngx_stream_health_detect_shm_free_node(node_shm);
     } else {
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
@@ -1843,7 +1863,11 @@ ngx_stream_health_detect_start_check_handler(ngx_event_t *event)
         ngx_stream_health_detect_free_node(node);
         return;
     } else {
-        ngx_add_timer(event, peer->policy->data.check_interval / 2);
+        if (peer_shm->fast_check_count < peer->policy->data.fall) {
+            ngx_add_timer(event, ngx_random() % 500);
+        } else {
+            ngx_add_timer(event, peer->policy->data.check_interval / 2);
+        }
 
         /* This process is processing this peer now. */
         if (peer_shm->owner == ngx_pid || peer->check_timeout_ev.timer_set) {
@@ -1869,6 +1893,11 @@ ngx_stream_health_detect_start_check_handler(ngx_event_t *event)
         }
 
         interval = ngx_current_msec - peer_shm->access_time;
+
+        if (peer_shm->fast_check_count < peer->policy->data.fall) {
+            peer_shm->fast_check_count += 1;
+            interval = (peer->policy->data.check_interval << 4) + 1;
+        }
 
         ngx_log_debug4(NGX_LOG_DEBUG_STREAM, event->log, 0,
             "http check begin handler owner: %P, "
@@ -1932,8 +1961,8 @@ ngx_stream_health_detect_add_timer(ngx_rbtree_node_t *node)
 
     srandom(ngx_pid);
     delay = peer->policy->data.check_interval > 1000
-                ? peer->policy->data.check_interval
-                : 1000;
+                ? 1000
+                : peer->policy->data.check_interval;
     ngx_add_timer(&peer->check_ev, ngx_random() % delay);
 
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, ngx_cycle->log, 0,
@@ -2048,6 +2077,8 @@ ngx_stream_health_detect_construct_policy(ngx_pool_t *temp_pool,
     if (policy->data.keepalive_time == NGX_CONF_UNSET_MSEC) {
         policy->data.keepalive_time = default_policy->keepalive_time;
     }
+
+    policy->data.from_upstream = 1;
 
     ngx_crc32_init(hash);
     ngx_crc32_update(&hash, policy->peer_name.data, policy->peer_name.len);
@@ -2190,13 +2221,13 @@ ngx_stream_health_detect_upstream_check_peer_down(
         peer_shm = (ngx_health_detect_peer_shm_t *) &node_shm->color;
         rc = (peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? 0 : 1);
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-            "upstream check peer(%V) down flag(%ui)", &full_name, rc);
+            "check stream upstream peer(%V) down flag(%ui)", &full_name, rc);
 
     } else {
         rc = 1;
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-            "upstream check peer(%V) not found, down flag(%ui)", &full_name,
-            rc);
+            "check stream upstream peer(%V) not found, down flag(%ui)",
+            &full_name, rc);
     }
     ngx_shmtx_unlock(&shpool->mutex);
 
@@ -2254,6 +2285,13 @@ ngx_stream_health_detect_sync_peers_to_peers_shm(ngx_uint_t reuse_old_data)
         }
 
         for (i = 0; i < delete_count; i++) {
+            peer_shm = (ngx_health_detect_peer_shm_t *) &delete_node[i]->color;
+            if (peer_shm->policy.data.from_upstream) {
+                /* because the free action occurs when reload, execute only
+                 * once, so force free this node even if it policy data
+                 * from_upstream*/
+                peer_shm->ref = 1;
+            }
             ngx_stream_health_detect_shm_free_node(delete_node[i]);
         }
     }

@@ -24,8 +24,9 @@
 #define NGX_PRASE_REQ_INVALID_CHECK_INTERVAL -10
 #define NGX_PRASE_REQ_INVALID_CHECK_TIMEOUT -11
 #define NGX_PRASE_REQ_INVALID_CHECK_FALL_RISE_NUMBER -12
-#define NGX_PRASE_REQ_NEED_KEEPALIVE_NOT_BOOL -13
+#define NGX_PRASE_REQ_KEEPALIVE_NOT_BOOL -13
 #define NGX_PRASE_REQ_INVALID_KEEPALIVE_TIME -14
+#define NGX_PRASE_REQ_DEFALU_DOWN_NOT_BOOL -15
 
 #define ADD_PEER 1
 #define UPDATE_PEER 2
@@ -1104,16 +1105,18 @@ ngx_health_detect_prase_request_body(
          * peer_addr  ngx_str_t
          *
          * option:
-         * send_content  ngx_str_t  empty means use default value
-         * alert_method  ngx_str_t  empty means use default value
+         * send_content    ngx_str_t  empty means use default value
+         * alert_method    ngx_str_t  empty means use default value
          * expect_response_status  ngx_str_t  empty means use default value
-         * check_interval  ngx_msec_int_t  empty means use default value
-         * check_timeout  ngx_msec_int_t  empty means use default value
-         * rise  ngx_uint_t  empty means use default value
-         * fall  ngx_uint_t  empty means use default value
-         * need_keepalive  ngx_uint_t  empty means use default value
+         * interval        ngx_msec_int_t  empty means use default value
+         * timeout         ngx_msec_int_t  empty means use default value
+         * rise            ngx_uint_t  empty means use default value
+         * fall            ngx_uint_t  empty means use default value
+         * keepalive       ngx_uint_t  empty means use default value
          * keepalive_time  ngx_msec_int_t  empty means use default value
+         * default_down    ngx_uint_t  empty means use default value
          * */
+
         policy =
             ngx_pcalloc(r->pool, sizeof(ngx_health_detect_detect_policy_t));
 
@@ -1126,7 +1129,7 @@ ngx_health_detect_prase_request_body(
         }
         policy->peer_name.len = peer_name.len;
 
-        attr = cJSON_GetObjectItem(requst_body_json, "peer_type");
+        attr = cJSON_GetObjectItem(requst_body_json, "type");
         if (attr == NULL) {
             *prase_error = NGX_PRASE_REQ_PEER_TYPE_NOT_FOUND;
             goto fail;
@@ -1271,7 +1274,7 @@ ngx_health_detect_prase_request_body(
             }
         }
 
-        attr = cJSON_GetObjectItem(requst_body_json, "check_interval");
+        attr = cJSON_GetObjectItem(requst_body_json, "interval");
         if (attr == NULL) {
             policy->data.check_interval = default_policy->check_interval;
         } else {
@@ -1283,7 +1286,7 @@ ngx_health_detect_prase_request_body(
             }
         }
 
-        attr = cJSON_GetObjectItem(requst_body_json, "check_timeout");
+        attr = cJSON_GetObjectItem(requst_body_json, "timeout");
         if (attr == NULL) {
             policy->data.check_timeout = default_policy->check_timeout;
         } else {
@@ -1295,14 +1298,46 @@ ngx_health_detect_prase_request_body(
             }
         }
 
-        attr = cJSON_GetObjectItem(requst_body_json, "need_keepalive");
+        attr = cJSON_GetObjectItem(requst_body_json, "keepalive");
         if (attr == NULL) {
             policy->data.need_keepalive = default_policy->need_keepalive;
         } else {
             policy->data.need_keepalive = attr->valueint;
             if (policy->data.need_keepalive != 0 &&
                 policy->data.need_keepalive != 1) {
-                *prase_error = NGX_PRASE_REQ_NEED_KEEPALIVE_NOT_BOOL;
+                *prase_error = NGX_PRASE_REQ_KEEPALIVE_NOT_BOOL;
+                goto fail;
+            }
+        }
+
+        attr = cJSON_GetObjectItem(requst_body_json, (char *) "keepalive");
+        if (attr == NULL) {
+            policy->data.need_keepalive = default_policy->need_keepalive;
+        } else {
+            data = attr->valuestring;
+            if (ngx_strcasecmp((u_char *) data, (u_char *) "true") == 0) {
+                policy->data.need_keepalive = 1;
+            } else if (ngx_strcasecmp((u_char *) data, (u_char *) "false") ==
+                       0) {
+                policy->data.need_keepalive = 0;
+            } else {
+                *prase_error = NGX_PRASE_REQ_KEEPALIVE_NOT_BOOL;
+                goto fail;
+            }
+        }
+
+        attr = cJSON_GetObjectItem(requst_body_json, (char *) "default_down");
+        if (attr == NULL) {
+            policy->data.default_down = 0;
+        } else {
+            data = attr->valuestring;
+            if (ngx_strcasecmp((u_char *) data, (u_char *) "true") == 0) {
+                policy->data.default_down = 1;
+            } else if (ngx_strcasecmp((u_char *) data, (u_char *) "false") ==
+                       0) {
+                policy->data.default_down = 0;
+            } else {
+                *prase_error = NGX_PRASE_REQ_DEFALU_DOWN_NOT_BOOL;
                 goto fail;
             }
         }
@@ -1319,6 +1354,7 @@ ngx_health_detect_prase_request_body(
             }
         }
 
+        policy->data.from_upstream = 0;
         *prase_error = NGX_PRASE_REQ_OK;
 
         ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
@@ -1399,8 +1435,11 @@ ngx_http_health_detect_process_request_with_body(ngx_http_request_t *r)
                 ngx_str_set(
                     &resp, "NGX_PRASE_REQ_INVALID_CHECK_FALL_RISE_NUMBER");
                 break;
-            case NGX_PRASE_REQ_NEED_KEEPALIVE_NOT_BOOL:
+            case NGX_PRASE_REQ_KEEPALIVE_NOT_BOOL:
                 ngx_str_set(&resp, "NGX_PRASE_REQ_NEED_KEEPALIVE_NOT_BOOL");
+                break;
+            case NGX_PRASE_REQ_DEFALU_DOWN_NOT_BOOL:
+                ngx_str_set(&resp, "NGX_PRASE_REQ_DEFALU_DOWN_NOT_BOOL");
                 break;
             case NGX_PRASE_REQ_INVALID_KEEPALIVE_TIME:
                 ngx_str_set(&resp, "NGX_PRASE_REQ_INVALID_KEEPALIVE_TIME");

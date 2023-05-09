@@ -1,6 +1,6 @@
 # ngx_health_detect_module
 
-(English language see [here](https://github.com/alexzzh/ngx_health_detect_module/blob/master/README-en.md))
+(English language see [here](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README-en.md))
 
 > 该模块可以提供主动式后端节点健康检查的功能，后端节点可以是Nginx upstream负载节点，在解析upstream配置时自动注册，保证新的请求直接发送到一个健康的后端节点，也可以通过Restful API动态注册后端节点，以便实时查看节点健康状态
 -----
@@ -35,7 +35,7 @@ Table of Contents
 模块开发背景
 ===========
 - 项目上需要使用主动健康检查功能，最开始使用[ngx_healthcheck_module](https://github.com/zhouchangxun/ngx_healthcheck_module)模块测试时发现很多问题，尤其是配合动态域名解析模块会发生动态增删upstream节点时问题尤为突出，存在本地以及共享内存节点数组索引使用混乱，重用本地以及共享内存节点空间时节点状态判断条件不严谨，并发访问共享内存节点时锁控制不合理，代码冗余太多等问题
-- 考虑到主动健康检查功能比较简单，就是增删节点以及查询节点状态，其实更适合使用红黑树作为节点存储结构，尤其是探测节点较多时效率更高，代码也更容易理解和维护。加上ngx_healthcheck_module模块最近一次提交在2021年6月，并没有持续被维护，所以不打算在这个模块上打补丁，由此产生了该模块，该模块功能等同于ngx_healthcheck_module模块 + restful api动态增删探测节点功能(开关控制，可关闭)
+- 考虑到主动健康检查功能比较简单，就是增删节点以及查询节点状态，其实更适合使用红黑树作为节点存储结构，尤其是探测节点较多时效率更高, 代码也更容易理解和维护。 加上ngx_healthcheck_module模块最近一次提交在2021年6月，并没有持续被维护，所以不打算在这个模块上打补丁，由此产生了该模块，该模块功能等同于ngx_healthcheck_module模块 + restful api动态增删探测节点功能(开关控制，可关闭)
 
 
 描述
@@ -64,8 +64,10 @@ Table of Contents
 git clone https://github.com/nginx/nginx.git
 git clone http://git.koal.com/zhangzhenghao/ngx_health_detect_module
 cd nginx/;
-git checkout branches/stable-xxx
-git apply ../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_xxx+.patch
+git checkout branches/release-1.12.0
+
+//apply patch or add patch manually
+git apply ../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_1.12+.patch
 
 ./auto/configure --add-module=../ngx_health_detect_module/
 make && make install
@@ -156,22 +158,22 @@ stream {
 -----
 
 `语法` 
-> {"peer_type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","check_interval":milliseconds,"check_timeout":milliseconds , "need_keepalive": 1|0, "keepalive_time": milliseconds , "rise":count, "fall":count}  
+> {"type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","interval":milliseconds,"timeout":milliseconds , "keepalive": "true"|"false", "keepalive_time": milliseconds , "rise":count, "fall":count, "default_down": "true"|"false"}
   
 > 只有"peer_type" 和 "peer_addr"是`必选`字段，其他字段不指定时使用默认值
 
 `默认值`: 
 - 探测类型为tcp
 ``` python
- {"send_content":"","alert_method":"log","expect_response_status":"","check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}  
+ {"send_content":"","alert_method":"log","expect_response_status":"","interval":30000,"timeout":3000 , "keepalive": "false", "keepalive_time": 3600000 , "rise":1, "fall":2, "default_down":"false"}
 ```
 - 探测类型为http
 ``` python
-{"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"check_interval":30000,"check_timeout":3000 , "need_keepalive": 0, "keepalive_time": 3600000 , "rise":1, "fall":2}
+{"send_content":"GET / HTTP/1.0\r\nConnection:close\r\n\r\n","alert_method":"log","expect_response_status":"http_2xx"，"interval":30000,"timeout":3000 , "keepalive": "true", "keepalive_time": 3600000 , "rise":1, "fall":2, "default_down":"false"}
 ```
 
 `详细参数`
-- peer_type: 探测类型
+- type: 探测类型
   - tcp：简单的tcp连接，如果连接成功，就说明后端正常。
   - http：发送HTTP请求，通过后端的回复包的状态来判断后端是否存活。
 - peer_addr: 探测节点地址
@@ -184,15 +186,16 @@ stream {
 - expect_response_status：预期响应值
   - tcp: 忽略该字段。
   - http: 指定收到哪些响应视为后端节点状态正常。
-- check_interval：向后端发送的健康检查包的间隔
-- check_timeout: 后端健康请求的超时时间
-- need_keepalive：指定是否启用长连接，如果使用长连接，多次探测会复用同一个连接，反之每次探测都需要新建连接
+- interval：向后端发送的健康检查包的间隔
+- timeout: 后端健康请求的超时时间
+- keepalive：指定是否启用长连接，如果使用长连接，多次探测会复用同一个连接，反之每次探测都需要新建连接
   - 长连接比短连接性能更好，但是需要处理连接保活以及持续消耗服务端连接资源问题，不考虑性能的情况下，`推荐`使用短连接。 
   - 探测类型为http且`send_content`指定使用`http keepalive`时，需要设置长连接。
   - 探测类型为tcp且与后端节点连接需要经过防火墙，NAT设备时，`不推荐`使用长连接。因为tcp长连接建立后，探活机制使用的是peek函数，此时即便防火墙会拦截请求包，peek仍然成功，直到超过`keepalive_time`，在此期间探测状态可能有误，设置更短的"keepalive_time" 可以降低该问题带来的影响
 - keepalive_time：指定长连接存活时间
 - fall(fall_count): 如果连续失败次数达到fall_count，后端节点就被认为是down。
 - rise(rise_count): 如果连续成功次数达到rise_count，后端节点就被认为是up。
+- default_down : 指定新加入的节点刚开始状态是否为down。
 
 [Back to TOC](#table-of-contents)
 
@@ -327,11 +330,11 @@ health_detect_check
 
 `语法`: health_detect_check type=http|tcp [alert_method=log|syslog] [interval=milliseconds] [timeout=milliseconds] [rise=count] [fall=count] [default_down=true|false][keepalive=true|false] [keepalive_time=milliseconds]; 
 
-`默认值`: health_detect_check type=tcp alert_method=log interval=30000 timeout=5000 rise=1 fall=2 default_down=true keepalive=false keepalive_time=3600000;
+`默认值`: health_detect_check type=tcp alert_method=log interval=30000 timeout=5000 rise=1 fall=2 default_down=false keepalive=false keepalive_time=3600000;
 
 `上下文`: http/upstream, stream/upstream
 
-通过在http或stream下的upstream配置块中添加该指令来开启对该upstream中的后端节点的健康检查，各字段解释同[探测策略各字段解释](https://github.com/alexzzh/ngx_health_detect_module#%E6%8E%A2%E6%B5%8B%E7%AD%96%E7%95%A5%E5%90%84%E5%AD%97%E6%AE%B5%E8%A7%A3%E9%87%8A)
+通过在http或stream下的upstream配置块中添加该指令来开启对该upstream中的后端节点的健康检查，各字段解释同[探测策略各字段解释](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/tree/master#%E6%8E%A2%E6%B5%8B%E7%AD%96%E7%95%A5%E5%90%84%E5%AD%97%E6%AE%B5%E8%A7%A3%E9%87%8A)
 
 
 health_detect_http_expect_alive
