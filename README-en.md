@@ -1,6 +1,6 @@
 # ngx_health_detect_module
 
-(中文版本请参考这里 [here](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README.md))
+(中文版本请参考这里 [here](https://github.com/alexzzh/ngx_health_detect_module/blob/master/README.md))
 
 > This module provides proactive health detect for back-end node, the back-end node can be Nginx upstream servers (support http upstream && stream upstream) which added when parsing upstream config or added by dynamic restful APIs
 -----
@@ -57,7 +57,7 @@ How to install
 
 ```
 git clone https://github.com/nginx/nginx.git
-git clone http://git.koal.com/zhangzhenghao/ngx_health_detect_module
+git clone https://github.com/alexzzh/ngx_health_detect_module.git
 cd nginx/;
 git checkout branches/release-1.12.0
 
@@ -315,7 +315,7 @@ health_detect_check
 
 `Context`: http/upstream, stream/upstream
 
-Specify whether to enable the health detect in this upstream, all fields are explained same as [Detect policy description](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/blob/master/README-en.md#detect-policy-description)
+Specify whether to enable the health detect in this upstream, all fields are explained same as [Detect policy description](https://github.com/alexzzh/ngx_health_detect_module/blob/master/README-en.md#detect-policy-description)
 
 
 health_detect_http_expect_alive
@@ -394,11 +394,11 @@ Bugs and Patches
 
 Please report bugs
 
-- create[GitHub Issue](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/issues),
+- create[GitHub Issue](https://github.com/alexzzh/ngx_health_detect_module/issues),
 
 or submit patches by
 
-- new [Pull request](http://git.koal.com/zhangzhenghao/ngx_health_detect_module/-/merge_requests)
+- new [Pull request](https://github.com/alexzzh/ngx_health_detect_module/pulls)
 
 [Back to TOC](#table-of-contents)
 
