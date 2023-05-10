@@ -277,7 +277,7 @@ ngx_http_health_detect_api_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t *value;
     ngx_http_core_loc_conf_t *clcf;
-    ngx_http_health_detect_api_loc_conf_t *apilcf;
+    ngx_http_health_detect_api_loc_conf_t *apilcf = NULL;
     ngx_str_t s;
 
     value = cf->args->elts;
@@ -316,6 +316,10 @@ ngx_http_health_detect_api_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    if (!apilcf) {
+      return NGX_CONF_ERROR;
+    }
+
     if (apilcf->used_module == NGX_CONF_UNSET_UINT) {
         apilcf->used_module = 0;
     }
@@ -331,7 +335,7 @@ ngx_stream_health_detect_api_mode(
 {
     ngx_str_t *value;
     ngx_http_core_loc_conf_t *clcf;
-    ngx_http_health_detect_api_loc_conf_t *apilcf;
+    ngx_http_health_detect_api_loc_conf_t *apilcf = NULL;
     ngx_str_t s;
 
     value = cf->args->elts;
@@ -368,6 +372,10 @@ ngx_stream_health_detect_api_mode(
                 s.data);
             return NGX_CONF_ERROR;
         }
+    }
+
+    if (!apilcf) {
+      return NGX_CONF_ERROR;
     }
 
     if (apilcf->used_module == NGX_CONF_UNSET_UINT) {
@@ -1022,7 +1030,7 @@ static ngx_int_t
 ngx_http_health_detect_process_request(
     ngx_http_request_t *r, ngx_uint_t arg_cmd, ngx_str_t *resp)
 {
-    ngx_int_t rc;
+    ngx_int_t rc = 0;
     ngx_str_t arg_name;
 
     if (arg_cmd == CHECK_ONE_PEER_STATUS) {
@@ -1604,7 +1612,7 @@ ngx_health_detect_api_handler(ngx_http_request_t *r)
 {
     ngx_int_t rc;
     ngx_http_health_detect_api_loc_conf_t *apicf;
-    ngx_int_t arg_cmd;
+    ngx_int_t arg_cmd = 0;
     ngx_str_t resp;
     ngx_buf_t *b;
     ngx_chain_t *out;
