@@ -1,0 +1,319 @@
+diff --git a/src/http/modules/ngx_http_upstream_hash_module.c b/src/http/modules/ngx_http_upstream_hash_module.c
+index 6c28c645..1b570d46 100644
+--- a/src/http/modules/ngx_http_upstream_hash_module.c
++++ b/src/http/modules/ngx_http_upstream_hash_module.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_http.h>
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++#include "ngx_http_health_detect_module.h"
++#endif
+ 
+ typedef struct {
+     uint32_t                            hash;
+@@ -235,6 +238,12 @@ ngx_http_upstream_get_hash_peer(ngx_peer_connection_t *pc, void *data)
+             goto next;
+         }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++        if (ngx_http_health_detect_upstream_check_peer_down(hp->rrp.peers->name, &peer->server, &peer->name)) {
++            goto next;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
+@@ -538,6 +547,12 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
+                 continue;
+             }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++            if (ngx_http_health_detect_upstream_check_peer_down(hp->rrp.peers->name, &peer->server, &peer->name)) {
++                continue;
++            }
++#endif
++
+             if (peer->server.len != server->len
+                 || ngx_strncmp(peer->server.data, server->data, server->len)
+                    != 0)
+diff --git a/src/http/modules/ngx_http_upstream_ip_hash_module.c b/src/http/modules/ngx_http_upstream_ip_hash_module.c
+index 296108fd..6e3efdd1 100644
+--- a/src/http/modules/ngx_http_upstream_ip_hash_module.c
++++ b/src/http/modules/ngx_http_upstream_ip_hash_module.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_http.h>
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++#include "ngx_http_health_detect_module.h"
++#endif
+ 
+ typedef struct {
+     /* the round robin data must be first */
+@@ -205,6 +208,12 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
+             goto next;
+         }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++        if (ngx_http_health_detect_upstream_check_peer_down(iphp->rrp.peers->name, &peer->server, &peer->name)) {
++            goto next;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
+diff --git a/src/http/modules/ngx_http_upstream_least_conn_module.c b/src/http/modules/ngx_http_upstream_least_conn_module.c
+index ebe06276..069bd0bf 100644
+--- a/src/http/modules/ngx_http_upstream_least_conn_module.c
++++ b/src/http/modules/ngx_http_upstream_least_conn_module.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_http.h>
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++#include "ngx_http_health_detect_module.h"
++#endif
+ 
+ static ngx_int_t ngx_http_upstream_init_least_conn_peer(ngx_http_request_t *r,
+     ngx_http_upstream_srv_conf_t *us);
+@@ -147,6 +150,12 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
+             continue;
+         }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++        if (ngx_http_health_detect_upstream_check_peer_down(rrp->peers->name, &peer->server, &peer->name)) {
++            continue;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
+@@ -202,6 +211,12 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
+                 continue;
+             }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++            if (ngx_http_health_detect_upstream_check_peer_down(rrp->peers->name, &peer->server, &peer->name)) {
++                continue;
++            }
++#endif
++
+             if (peer->conns * best->weight != best->conns * peer->weight) {
+                 continue;
+             }
+diff --git a/src/http/ngx_http_upstream_round_robin.c b/src/http/ngx_http_upstream_round_robin.c
+index f6051ae5..e1bbae35 100644
+--- a/src/http/ngx_http_upstream_round_robin.c
++++ b/src/http/ngx_http_upstream_round_robin.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_http.h>
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++#include "ngx_http_health_detect_module.h"
++#endif
+ 
+ #define ngx_http_upstream_tries(p) ((p)->number                               \
+                                     + ((p)->next ? (p)->next->number : 0))
+@@ -98,6 +101,12 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
+                 peer[n].down = server[i].down;
+                 peer[n].server = server[i].name;
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++                if (!server[i].down) {
++                    ngx_http_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                }
++#endif
++
+                 *peerp = &peer[n];
+                 peerp = &peer[n].next;
+                 n++;
+@@ -162,6 +171,12 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
+                 peer[n].down = server[i].down;
+                 peer[n].server = server[i].name;
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++                if (!server[i].down) {
++                    ngx_http_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                }
++#endif
++
+                 *peerp = &peer[n];
+                 peerp = &peer[n].next;
+                 n++;
+@@ -443,6 +458,12 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
+             goto failed;
+         }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++        if (ngx_http_health_detect_upstream_check_peer_down(peers->name, &peer->server, &peer->name)) {
++            goto failed;
++        }
++#endif
++
+         rrp->current = peer;
+ 
+     } else {
+@@ -537,6 +558,12 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
+             continue;
+         }
+ 
++#if (NGX_HTTP_HEALTH_DETECT)
++        if (ngx_http_health_detect_upstream_check_peer_down(rrp->peers->name, &peer->server, &peer->name)) {
++            continue;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
+diff --git a/src/stream/ngx_stream_upstream_hash_module.c b/src/stream/ngx_stream_upstream_hash_module.c
+index cb44fcda..f7d908dd 100644
+--- a/src/stream/ngx_stream_upstream_hash_module.c
++++ b/src/stream/ngx_stream_upstream_hash_module.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_stream.h>
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++#include "ngx_stream_health_detect_module.h"
++#endif
+ 
+ typedef struct {
+     uint32_t                              hash;
+@@ -234,6 +237,12 @@ ngx_stream_upstream_get_hash_peer(ngx_peer_connection_t *pc, void *data)
+             goto next;
+         }
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++        if (ngx_stream_health_detect_upstream_check_peer_down(hp->rrp.peers->name, &peer->server, &peer->name)) {
++            goto next;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
+@@ -539,6 +548,12 @@ ngx_stream_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
+                 continue;
+             }
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++            if (ngx_stream_health_detect_upstream_check_peer_down(hp->rrp.peers->name, &peer->server, &peer->name)) {
++                continue;
++            }
++#endif
++
+             if (peer->server.len != server->len
+                 || ngx_strncmp(peer->server.data, server->data, server->len)
+                    != 0)
+diff --git a/src/stream/ngx_stream_upstream_least_conn_module.c b/src/stream/ngx_stream_upstream_least_conn_module.c
+index 739b20a9..bca54c69 100644
+--- a/src/stream/ngx_stream_upstream_least_conn_module.c
++++ b/src/stream/ngx_stream_upstream_least_conn_module.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_stream.h>
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++#include "ngx_stream_health_detect_module.h"
++#endif
+ 
+ static ngx_int_t ngx_stream_upstream_init_least_conn_peer(
+     ngx_stream_session_t *s, ngx_stream_upstream_srv_conf_t *us);
+@@ -143,6 +146,12 @@ ngx_stream_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
+             continue;
+         }
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++        if (ngx_stream_health_detect_upstream_check_peer_down(rrp->peers->name, &peer->server, &peer->name)) {
++            continue;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
+@@ -198,6 +207,12 @@ ngx_stream_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
+                 continue;
+             }
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++            if (ngx_stream_health_detect_upstream_check_peer_down(rrp->peers->name, &peer->server, &peer->name)) {
++                continue;
++            }
++#endif
++
+             if (peer->conns * best->weight != best->conns * peer->weight) {
+                 continue;
+             }
+diff --git a/src/stream/ngx_stream_upstream_round_robin.c b/src/stream/ngx_stream_upstream_round_robin.c
+index 526de3a8..d9e289f3 100644
+--- a/src/stream/ngx_stream_upstream_round_robin.c
++++ b/src/stream/ngx_stream_upstream_round_robin.c
+@@ -9,6 +9,9 @@
+ #include <ngx_core.h>
+ #include <ngx_stream.h>
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++#include "ngx_stream_health_detect_module.h"
++#endif
+ 
+ #define ngx_stream_upstream_tries(p) ((p)->number                             \
+                                       + ((p)->next ? (p)->next->number : 0))
+@@ -104,6 +107,12 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
+                 peer[n].down = server[i].down;
+                 peer[n].server = server[i].name;
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++                if (!server[i].down) {
++                    ngx_stream_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                }
++#endif
++
+                 *peerp = &peer[n];
+                 peerp = &peer[n].next;
+                 n++;
+@@ -168,6 +177,12 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
+                 peer[n].down = server[i].down;
+                 peer[n].server = server[i].name;
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++                if (!server[i].down) {
++                    ngx_stream_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                }
++#endif
++
+                 *peerp = &peer[n];
+                 peerp = &peer[n].next;
+                 n++;
+@@ -448,6 +463,12 @@ ngx_stream_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
+             goto failed;
+         }
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++        if (ngx_stream_health_detect_upstream_check_peer_down(peers->name, &peer->server, &peer->name)) {
++            goto failed;
++        }
++#endif
++
+         if (peer->max_conns && peer->conns >= peer->max_conns) {
+             goto failed;
+         }
+@@ -546,6 +567,12 @@ ngx_stream_upstream_get_peer(ngx_stream_upstream_rr_peer_data_t *rrp)
+             continue;
+         }
+ 
++#if (NGX_STREAM_HEALTH_DETECT)
++        if (ngx_stream_health_detect_upstream_check_peer_down(rrp->peers->name, &peer->server, &peer->name)) {
++            continue;
++        }
++#endif
++
+         if (peer->max_fails
+             && peer->fails >= peer->max_fails
+             && now - peer->checked <= peer->fail_timeout)
