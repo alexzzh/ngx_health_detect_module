@@ -1,6 +1,4 @@
-ngx_module_name="ngx_health_detect_api_module \
-                 ngx_http_health_detect_module \
-                 ngx_stream_health_detect_module "
+ngx_module_path="$ngx_addon_dir"
 ngx_module_deps="$ngx_addon_dir/ngx_http_health_detect_module.h \
                   $ngx_addon_dir/ngx_stream_health_detect_module.h \
                   $ngx_addon_dir/ngx_health_detect_common.h  \
@@ -14,9 +12,19 @@ ngx_module_srcs="$ngx_addon_dir/ngx_health_detect_api.c \
                  $ngx_addon_dir/ngx_health_detect_common.c "
 ngx_module_libs="-lm"
 
+have=NGX_HTTP_HEALTH_DETECT  . auto/have
+have=NGX_STREAM_HEALTH_DETECT . auto/have
+
 if [ "$ngx_module_link" = DYNAMIC ]; then
   echo "[ERROR] ngx_health_detect_module do not support dynamic loading yet. Use --add-module."
   exit 1
+else
+  HTTP_MODULES="$HTTP_MODULES ngx_health_detect_api_module"
+  HTTP_MODULES="$HTTP_MODULES ngx_http_health_detect_module"
+  STREAM_MODULES="$STREAM_MODULES ngx_stream_health_detect_module"
+  CORE_INCS="$CORE_INCS $ngx_module_path"
+  NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_module_deps"
+  NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_module_src"
 fi
 
 . auto/module
