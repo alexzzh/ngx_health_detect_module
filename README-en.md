@@ -59,12 +59,9 @@ How to install
 git clone https://github.com/nginx/nginx.git
 git clone https://github.com/alexzzh/ngx_health_detect_module.git
 cd nginx/;
-git checkout branches/release-1.12.0
+git checkout branches/stable-1.20
 
-//apply patch or add patch manually
-git apply ../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_1.12+.patch
-
-./auto/configure --add-module=../ngx_health_detect_module/
+auto/configure --with-stream --add-module=../ngx_health_detect_module
 make && make install
 ```
 
