@@ -409,7 +409,8 @@ ngx_health_detect_judge_cond_to_string(
 
 static void
 ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
-    ngx_rbtree_node_t *sentinel, ngx_buf_t *b, ngx_uint_t status_flag)
+    ngx_rbtree_node_t *sentinel, ngx_buf_t *b, ngx_uint_t status_flag,
+    u_char *items_start)
 {
     ngx_health_detect_peer_shm_t *peer_shm;
     ngx_uint_t need_print;
@@ -419,7 +420,8 @@ ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
     }
 
     ngx_http_rbtree_traverse_all_status_json_format(
-        node_shm->left, sentinel, b, status_flag);
+        node_shm->left, sentinel, b, status_flag,
+        items_start);
 
     need_print = 1;
     peer_shm = (ngx_health_detect_peer_shm_t *) (&node_shm->color);
@@ -432,9 +434,9 @@ ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
 
     if (need_print) {
         b->last = ngx_snprintf(b->last, b->end - b->last,
-            "    {\"name\": \"%V\",\"addr\": \"%V\",\"access_time\": %V, "
-            "\"status\": "
-            "\"%s\"}, \n",
+            "%s  {\"name\":\"%V\", \"addr\":\"%V\", \"access_time\":\"%V\", "
+            "\"status\":\"%s\"}",
+            b->last > items_start ? ",\n" : "",
             &peer_shm->policy.peer_name, &peer_shm->policy.peer_addr.name,
             &peer_shm->status.latest_access_time,
             peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? "up"
@@ -442,7 +444,8 @@ ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
     }
 
     ngx_http_rbtree_traverse_all_status_json_format(
-        node_shm->right, sentinel, b, status_flag);
+        node_shm->right, sentinel, b, status_flag,
+        items_start);
 }
 
 static void
@@ -466,15 +469,15 @@ ngx_http_health_detect_all_status_json_format(ngx_http_request_t *r,
     }
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
-        "{\n\"total\": %ui,\n \"up\": %ui,\n \"down\": %ui,"
-        "\n \"max\": %ui,\n\"items\": [\n",
+        "{\n \"total\": %ui,\n \"up\": %ui,\n \"down\": %ui,"
+        "\n \"max\": %ui,\n \"items\": [\n",
         peers_shm->number, peers_shm->number - down_count, down_count,
         peers_shm->max_number);
 
     ngx_http_rbtree_traverse_all_status_json_format(
-        node_shm, sentinel, b, status_flag);
+        node_shm, sentinel, b, status_flag, b->last);
 
-    b->last = ngx_snprintf(b->last, b->end - b->last, "  ]\n");
+    b->last = ngx_snprintf(b->last, b->end - b->last, "\n ]\n");
     b->last = ngx_snprintf(b->last, b->end - b->last, "}\n");
 }
 
