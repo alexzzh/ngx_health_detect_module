@@ -66,6 +66,14 @@ patch -p1 <../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_x.yy+.
 
 auto/configure --with-stream --add-module=../ngx_health_detect_module
 make && make install
+
+
+//how to generate patch file
+- git clone https://github.com/nginx/nginx.git
+- git checkout branches/stable-1.20.x
+- adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.18+.patch
+- diff * > nginx_healthdetect_for_nginx_1.18+.patch
+- upload this patch to this repo if you want
 ```
 
 [Back to TOC](#table-of-contents)
