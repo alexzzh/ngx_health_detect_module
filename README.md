@@ -43,7 +43,7 @@ Development background
     - [Data is not protected by lock when accessing shared memory 2](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_http_upstream_check_module.c#L2266)
   - ngx_stream_upstream_check_module bugs after test in our project:
     - [Memory leak, call ngx_slab_free_locked(shpool, peer_shm[index].sockaddr) when fail](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1249)
-    - [The node being deleted may be reused, and the delete flag needs to be considered as a PEER_DELETED](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1188)
+    - [The node being deleted may be reused, and the delete flag needs to be considered as a PEER_DELETING](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1188)
     - [Redundant judgments, index >= check_ctx->peers_shm->max_number can never be executed](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L361)
     - [It is necessary to return the shared memory array index (peer[i].index) instead of the process-local array index (i) and will cause the wrong node state to be returned](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1311)
     - [Data is not protected by lock when accessing shared memory 1](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1514)
