@@ -34,8 +34,28 @@ Table of Contents
 
 模块开发背景
 ===========
-- 项目上需要使用主动健康检查功能，最开始使用[ngx_healthcheck_module](https://github.com/zhouchangxun/ngx_healthcheck_module)模块测试时发现很多问题，尤其是配合动态域名解析模块会发生动态增删upstream节点时问题尤为突出，存在本地以及共享内存节点数组索引使用混乱，重用本地以及共享内存节点空间时节点状态判断条件不严谨，并发访问共享内存节点时锁控制不合理，代码冗余太多等问题
-- 考虑到主动健康检查功能比较简单，就是增删节点以及查询节点状态，其实更适合使用红黑树作为节点存储结构，尤其是探测节点较多时效率更高, 代码也更容易理解和维护。 加上ngx_healthcheck_module模块最近一次提交在2021年6月，并没有持续被维护，所以不打算在这个模块上打补丁，由此产生了该模块，该模块功能等同于ngx_healthcheck_module模块 + restful api动态增删探测节点功能(开关控制，可关闭)
+- 项目上需要使用主动健康检查功能而且可能需要结合第三方动态域名解析模块动态增删探测节点，而开源方案 [ngx_healthcheck_module](https://github.com/zhouchangxun/ngx_healthcheck_module/tree/master)不支持动态API且存在一些问题，[ngx_stream_upstream_check_module](https://github.com/alibaba/tengine/tree/master/modules/ngx_http_upstream_check_module) 模块虽然支持动态API，但是存在本地以及共享内存节点数组索引使用混乱，重用本地以及共享内存节点空间时节点状态判断条件不严谨，并发访问共享内存节点时锁控制不合理，不支持stream模块等问题
+- 考虑到主动健康检查功能比较简单，就是结合upstream模块增删节点以及查询节点状态，其实更适合使用红黑树作为节点存储结构，尤其是探测节点较多时效率更高, 使用红黑树代替动态数组，从根本上上避免了(1),(2)问题的出现，所以代码也更容易理解和维护，由此产生了该模块并修复了上述bug，该模块功能等同于ngx_healthcheck_module/ngx_stream_upstream_check_module模块 + restful api动态增删探测节点功能(开关控制，可关闭)
+- ngx_healthcheck_module 在我们项目中测试发现存在的问题:
+  - [连接失败时没有清理连接状态以及共享内存节点状态，需要调用ngx_stream_upstream_check_clean_event](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_stream_upstream_check_module.c#L714)
+  - [此时应该显示的是共享内存数组index而不是进程本地数组Index，会造成每个进程返回的状态index不一致，i ==> peer[i].index](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_healthcheck_status.c#LL529C20-L529C20)
+  - [共享内存节点永远不会复用](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_http_upstream_check_module.c#L3523)
+  - [探测方式为TCP时不能配置长短连接](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_http_upstream_check_module.c#L551)
+  - [查询状态时参数index是共享内存数组的index，不应该和进程本地数组个数做对比，应该对比共享内存数组个数，也没有判断 peer[index].delete 是否为1过滤已删除节点](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_http_upstream_check_module.c#L787)
+  - [没有先判断 peer[index].delete 标志过滤已删除节点](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_healthcheck_status.c#L416)
+  - [访问共享内存时数据时没有加锁保护 1](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_http_upstream_check_module.c#L793)
+  - [访问共享内存时数据时没有加锁保护 1](https://github.com/zhouchangxun/ngx_healthcheck_module/blob/master/ngx_http_upstream_check_module.c#L2266)
+- ngx_stream_upstream_check_module 在我们项目中测试发现存在的问题:
+  - [内存泄漏,fail时需调用ngx_slab_free_locked(shpool, peer_shm[index].sockaddr)](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1249)
+  - [可能会复用正在删除的节点，delete值需要考虑为PEER_DELETING的情况](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1188)
+  - [多余的判断，index >= check_ctx->peers_shm->max_number永远执行不到](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L361)
+  - [需要返回共享内存数组下标(peer[i].index)，而不是进程本地数组下标(i)，返回错误的节点状态](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1311)
+  - [访问共享内存时数据时没有加锁保护 1](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1514)
+  - [访问共享内存时数据时没有加锁保护 2](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1484)
+  - [共享内存锁(shpool->mutex)和节点锁存在使用混乱 1](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1370)
+  - [共享内存锁(shpool->mutex)和节点锁存在使用混乱 2](https://github.com/alibaba/tengine/blob/master/modules/ngx_http_upstream_check_module/ngx_http_upstream_check_module.c#L1187)
+
+
 
 
 描述
