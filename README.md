@@ -33,7 +33,7 @@ Development background
   - Considering that the proactive health check function is relatively simple, that is, combined with the upstream module to add and delete detect nodes and query the node status, it is actually more suitable to use the rbtree as the node storage structure, especially when there are many detection nodes, it is more efficient,use rbtree instead of dynamic dynamic arrays, fundamentally avoid the occurrence of (1) and (2) bugs, the code is also easier to understand and maintain, so the module was developed and the above issue has been fixed, which is equivalent to ngx_healthcheck_module/ngx_stream_upstream_check_module module + restful API dynamic addition and deletion of detect node function (switch control, can be turned off)
 
     - ngx_http_upstream_check_module [bugs](https://github.com/alibaba/tengine/issues/1778) after test in our project
-    - ngx_healthcheck_module [bugs](https://github.com/zhouchangxun/ngx_healthcheck_module/issues/57) after test in our project:
+    - ngx_healthcheck_module [bugs](https://github.com/zhouchangxun/ngx_healthcheck_module/issues/58) after test in our project:
 
 Description
 ===========
