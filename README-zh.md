@@ -19,6 +19,7 @@ Table of Contents
 * [模块开发背景](#模块开发背景)
 * [描述](#描述)
 * [如何安装](#如何安装)
+* [制作patch](#制作patch)
 * [开发者快速指南](#开发者快速指南)
 * [基本用法](#基本用法)
 * [探测策略各字段解释](#探测策略各字段解释)
@@ -73,13 +74,21 @@ git apply ../ngx_health_detect_module/patch/nginx_healthdetect_for_nginx_x.xx+.p
 
 auto/configure --with-stream --add-module=../ngx_health_detect_module
 make && make install
+```
 
-//how to generate patch file
-- git clone https://github.com/nginx/nginx.git
-- git checkout branches/stable-1.20.x
-- adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.18+.patch
-- diff * > nginx_healthdetect_for_nginx_1.18+.patch
-- upload this patch to this repo if you want
+[Back to TOC](#table-of-contents)
+
+制作patch
+============
+
+```
+如果patch文件夹下没有对应nginx版本的patch,可以通过下述步骤快速制作:
+
+1 git clone https://github.com/nginx/nginx.git
+2 git checkout branches/stable-x.y.z(目标版本)
+3 adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.18+.patch
+4 diff * > nginx_healthdetect_for_nginx_1.18+.patch
+5 upload this patch to this repo if you want
 ```
 
 [Back to TOC](#table-of-contents)
