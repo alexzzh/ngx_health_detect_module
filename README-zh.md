@@ -34,7 +34,7 @@ Table of Contents
 
 模块开发背景
 ===========
-- 项目上需要使用主动健康检查功能而且可能需要结合第三方动态域名解析模块动态增删探测节点，而开源方案 [ngx_healthcheck_module](https://github.com/zhouchangxun/ngx_healthcheck_module/tree/master)不支持动态API且存在一些问题，[ngx_http_upstream_check_module](https://github.com/alibaba/tengine/tree/master/modules/ngx_http_upstream_check_module) 模块虽然支持动态API，但是存在本地以及共享内存节点数组索引使用混乱，重用本地以及共享内存节点空间时节点状态判断条件不严谨，并发访问共享内存节点时锁控制不合理，不支持stream模块等问题
+- 项目上需要使用主动健康检查功能而且可能需要结合第三方动态域名解析模块动态增删探测节点，而开源方案 [ngx_healthcheck_module](https://github.com/zhouchangxun/ngx_healthcheck_module/tree/master)不支持动态API且存在一些问题，[ngx_http_upstream_check_module](https://github.com/alibaba/tengine/tree/master/modules/ngx_http_upstream_check_module) 模块虽然支持动态API，但是存在本地以及共享内存节点数组索引使用混乱(1)，重用本地以及共享内存节点空间时节点状态判断条件不严谨(2)，并发访问共享内存节点时锁控制不合理(3)，不支持stream模块等问题
 - 考虑到主动健康检查功能比较简单，就是结合upstream模块增删节点以及查询节点状态，其实更适合使用红黑树作为节点存储结构，尤其是探测节点较多时效率更高, 使用红黑树代替动态数组，从根本上上避免了(1),(2)问题的出现，所以代码也更容易理解和维护，由此产生了该模块并修复了上述bug，该模块功能等同于ngx_healthcheck_module/ngx_stream_upstream_check_module模块 + restful api动态增删探测节点功能(开关控制，可关闭)
   - ngx_http_upstream_check_module [bugs](https://github.com/alibaba/tengine/issues/1778) after test in our project
   - ngx_healthcheck_module [bugs](https://github.com/zhouchangxun/ngx_healthcheck_module/issues/57) after test in our project: 
