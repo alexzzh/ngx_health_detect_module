@@ -163,7 +163,7 @@ Detect policy description
 `Syntax` 
 > {"type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","interval":milliseconds,"timeout":milliseconds , "keepalive": "true"|"false", "keepalive_time": milliseconds , "rise":count, "fall":count, "default_down": "true"|"false"}
   
-> Only `peer_type` and `peer_addr` fields are `must` required, other fields use default value if not specified
+> Only `type` and `peer_addr` fields are `must` required, other fields use default value if not specified
 
 `Default`: 
 - tcp
@@ -213,7 +213,7 @@ ip:port/http_api/control?cmd=status_all[&status=down|up][&format=json|html]
 ```
 - Add detect node
 ``` python
-curl -X POST -H 'Content-Type: application/json' -d '{"peer_type":"http","peer_addr":"10.0.229.100:34001","send_content":"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n","alert_method":"log","expect_response":"http_2xx","check_interval":5000,"check_timeout":3000, "need_keepalive": 1, "keepalive_time": 200000, "rise":1, "fall":2}' '10.0.229.99:641/http_api/control?cmd=add\&name=nginx4001'
+curl -X POST -H 'Content-Type: application/json' -d '{"type":"http","peer_addr":"10.0.229.100:34001","send_content":"GET / HTTP/1.0\r\nConnection:keep-alive\r\n\r\n","alert_method":"log","expect_response":"http_2xx","check_interval":5000,"check_timeout":3000, "need_keepalive": 1, "keepalive_time": 200000, "rise":1, "fall":2}' '10.0.229.99:641/http_api/control?cmd=add\&name=nginx4001'
 
 add or update node success
 ```
