@@ -1500,7 +1500,7 @@ ngx_health_detect_api_check_url_valid(
     ngx_http_request_t *r, ngx_int_t *arg_cmd, ngx_str_t *resp)
 {
     ngx_int_t rc;
-    size_t len;
+    size_t len = 0;
     u_char *p;
     ngx_str_t arg_cmd_s;
     ngx_str_t arg_name_s;
