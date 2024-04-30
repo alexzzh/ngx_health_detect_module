@@ -35,7 +35,7 @@ typedef struct {
     u_char others[0];
 } ngx_ssl_server_hello_t;
 
-#pragma pack()
+#pragma pack(pop)
 
 typedef struct {
     ngx_buf_t send;
