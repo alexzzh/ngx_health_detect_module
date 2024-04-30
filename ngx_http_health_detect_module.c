@@ -2188,6 +2188,11 @@ ngx_http_health_detect_upstream_check_peer_down(
     ngx_health_detect_peer_shm_t *peer_shm;
     ngx_uint_t rc;
 
+    /* upstream server_name is empty when not use upstream block */
+    if (server_name->len == 0) {
+        return 0;
+    }
+
     temp_pool = ngx_create_pool(ngx_pagesize, ngx_cycle->log);
     full_name.len =
         upstream_name->len + server_name->len + peer_addr_name->len + 2;
