@@ -679,7 +679,7 @@ ngx_stream_health_detect_recv_handler(ngx_event_t *event)
             ngx_err_t err;
 
             err = (size >= 0) ? 0 : ngx_socket_errno;
-            ngx_log_debug2(NGX_LOG_DEBUG_STREAM, c->log, 0,
+            ngx_log_debug2(NGX_LOG_DEBUG_STREAM, c->log, err,
                 "http check parse rc: %i, peer: %V ", rc,
                 &peer->policy->peer_addr.name);
         }
