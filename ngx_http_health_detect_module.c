@@ -684,7 +684,7 @@ ngx_http_health_detect_recv_handler(ngx_event_t *event)
             err = (size >= 0) ? 0 : ngx_socket_errno;
             ngx_log_error(NGX_LOG_DEBUG, c->log, err,
                 "http check recv size: %z, peer: %V ", size,
-                &peer->policy.peer_addr.name);
+                &peer->policy->peer_addr.name);
         }
 #endif
 
