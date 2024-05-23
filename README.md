@@ -13,20 +13,28 @@
 
 Table of Contents
 =================
-* [Development background](#development-background)
-* [Description](#description)
-* [How to install](#how-to-install)
-* [Make patch](#make-patch)
-* [Basic usage](#basic-usage)
-* [Detect policy description](#detect-policy-description)
-* [Restful api](#restful-api)
-* [Added nginx directive](#added-nginx-directive)
-* [Test report](#test-report)
-* [Todo](#todo)
-* [Status](#status)
-* [Bugs and patches](#bugs-and-patches)
-* [See also](#see-also)
-* [Copyright and License](#copyright-and-license)
+- [ngx\_health\_detect\_module](#ngx_health_detect_module)
+- [Table of Contents](#table-of-contents)
+- [Development background](#development-background)
+- [Description](#description)
+- [How to install](#how-to-install)
+- [Make patch](#make-patch)
+- [Basic usage](#basic-usage)
+- [Detect policy description](#detect-policy-description)
+- [Restful api](#restful-api)
+- [Added nginx directive](#added-nginx-directive)
+  - [health\_detect\_dynamic\_api](#health_detect_dynamic_api)
+  - [health\_detect\_shm\_size](#health_detect_shm_size)
+  - [health\_detect\_max\_history\_status\_count](#health_detect_max_history_status_count)
+  - [health\_detect\_check](#health_detect_check)
+  - [health\_detect\_http\_expect\_alive](#health_detect_http_expect_alive)
+  - [health\_detect\_http\_send](#health_detect_http_send)
+- [Test report](#test-report)
+- [Todo](#todo)
+- [Status](#status)
+- [Bugs and Patches](#bugs-and-patches)
+- [See also](#see-also)
+- [Copyright and License](#copyright-and-license)
 
 Development background
 ======================
@@ -80,11 +88,13 @@ Make patch
 ```
 you can make new version patch if not found patch under "patch" directory:
 
-1 git clone https://github.com/nginx/nginx.git
-2 git checkout branches/stable-x.y.z(new version)
-3 adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.18+.patch
-4 diff * > nginx_healthdetect_for_nginx_1.18+.patch
-5 upload this patch to this repo if you want
+1 git clone https://github.com/nginx/nginx.git or customized nginx repo
+2 cd nginx or customized nginx directory
+3 git checkout branches/stable-x.y.z(目标版本)
+4 adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.26+.patch
+5 git diff * > nginx_healthdetect_for_nginx_x.y+.patch 
+6 upload this patch to this repo if you want
+
 ```
 
 [Back to TOC](#table-of-contents)

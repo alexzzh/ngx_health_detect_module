@@ -82,13 +82,15 @@ make && make install
 ============
 
 ```
-如果patch文件夹下没有对应nginx版本的patch,可以通过下述步骤快速制作:
+如果patch文件夹下没有对应nginx版本patch或者需要基于定制化版本的nginx制作patch,可以通过下述步骤快速制作:
 
-1 git clone https://github.com/nginx/nginx.git
-2 git checkout branches/stable-x.y.z(目标版本)
-3 adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.18+.patch
-4 diff * > nginx_healthdetect_for_nginx_1.18+.patch
-5 upload this patch to this repo if you want
+1 git clone https://github.com/nginx/nginx.git or customized nginx repo
+2 cd nginx or customized nginx directory
+3 git checkout branches/stable-x.y.z(目标版本)
+4 adjust nginx source code according to other version patch, eg : nginx_healthdetect_for_nginx_1.26+.patch
+5 git diff * > nginx_healthdetect_for_nginx_x.y+.patch 
+6 upload this patch to this repo if you want
+
 ```
 
 [Back to TOC](#table-of-contents)
