@@ -48,6 +48,8 @@ static ngx_int_t ngx_http_health_detect_status_update(
 
 static ngx_int_t ngx_http_health_detect_add_timer(ngx_rbtree_node_t *node);
 static ngx_int_t ngx_http_health_detect_init_process(ngx_cycle_t *cycle);
+static void ngx_http_health_detect_exit_process(ngx_cycle_t *cycle);
+static void ngx_http_health_detect_exit_master(ngx_cycle_t *cycle);
 static ngx_int_t ngx_http_health_detect_need_exit();
 
 static void ngx_http_health_detect_clean_timeout_event_and_connection(
@@ -146,7 +148,7 @@ static ngx_http_module_t ngx_http_health_detect_modules_ctx = {
 ngx_module_t ngx_http_health_detect_module = {NGX_MODULE_V1,
     &ngx_http_health_detect_modules_ctx, ngx_http_health_detect_cmds,
     NGX_HTTP_MODULE, NULL, NULL, ngx_http_health_detect_init_process, NULL,
-    NULL, NULL, NULL, NGX_MODULE_V1_PADDING};
+    NULL, ngx_http_health_detect_exit_process, ngx_http_health_detect_exit_master, NGX_MODULE_V1_PADDING};
 
 static void *
 ngx_http_health_detect_create_main_conf(ngx_conf_t *cf)
@@ -1438,12 +1440,11 @@ ngx_http_health_detect_add_or_update_node_on_local(
     return NGX_OK;
 
 failed:
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+        "on local: op(add/update) node key(%V) failed", &policy->peer_name);    
     if (node) {
         ngx_http_health_detect_free_node(node);
     }
-
-    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-        "on local: op(add/update) node key(%V) failed", &policy->peer_name);
 
     return NGX_ERROR;
 }
@@ -1612,11 +1613,11 @@ ngx_http_health_detect_status_update(ngx_rbtree_node_t *node, ngx_uint_t result)
         node->key, &peer->policy->peer_name);
     if (node_shm == NULL) {
         ngx_shmtx_unlock(&shpool->mutex);
-        ngx_http_health_detect_free_node(node);
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
             "on status update:peer name(%V) not exit in shm, so needn't "
             "update status",
             &peer->policy->peer_name);
+        ngx_http_health_detect_free_node(node);
 
         return NGX_DONE;
     }
@@ -1624,12 +1625,12 @@ ngx_http_health_detect_status_update(ngx_rbtree_node_t *node, ngx_uint_t result)
     peer_shm = (ngx_health_detect_peer_shm_t *) &node_shm->color;
     if (peer_shm->policy.checksum != peer->policy->checksum) {
         ngx_shmtx_unlock(&shpool->mutex);
-        ngx_http_health_detect_free_node(node);
-
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
             "on status update:peer name(%V) exit in shm but policy is "
             "diff, so needn't update status",
             &peer->policy->peer_name);
+        ngx_http_health_detect_free_node(node);
+
 
         return NGX_DONE;
     }
@@ -1835,12 +1836,12 @@ ngx_http_health_detect_start_check_handler(ngx_event_t *event)
         node->key, &peer->policy->peer_name);
     if (node_shm == NULL) {
         ngx_shmtx_unlock(&shpool->mutex);
-        ngx_http_health_detect_free_node(node);
-
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
             "on start check handler: peer name(%V) not exit in shm, "
             "needn't check again",
             &peer->policy->peer_name);
+        ngx_http_health_detect_free_node(node);
+
         return;
     }
 
@@ -2503,4 +2504,15 @@ ngx_http_health_detect_init_process(ngx_cycle_t *cycle)
         return rc;
     }
     return ngx_http_health_detect_add_reload_shm_timer(cycle);
+}
+
+static void
+ngx_http_health_detect_exit_process(ngx_cycle_t *cycle)
+{
+    ngx_http_health_detect_delete_all_node();
+}
+
+static void ngx_http_health_detect_exit_master(ngx_cycle_t *cycle)
+{   
+    ngx_http_health_detect_delete_all_node();
 }
