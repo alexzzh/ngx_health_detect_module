@@ -150,7 +150,7 @@ ngx_stream_health_detect_create_main_conf(ngx_conf_t *cf)
 {
     ngx_stream_health_detect_main_conf_t *hdmcf;
     ngx_health_detect_peers_t *peers;
-
+    ngx_stream_health_detect_delete_all_node();
     hdmcf = ngx_pcalloc(cf->pool, sizeof(ngx_stream_health_detect_main_conf_t));
     if (hdmcf == NULL) {
         return NULL;
