@@ -38,7 +38,7 @@ static ngx_rbtree_node_t *ngx_http_health_detect_peers_rbtree_lookup(
 ngx_rbtree_node_t *ngx_http_health_detect_peers_shm_rbtree_lookup(
     uint32_t hash, ngx_str_t *key);
 ngx_int_t ngx_http_health_detect_add_or_update_node(
-    ngx_health_detect_detect_policy_t *policy);
+    ngx_pool_t * pool,ngx_health_detect_detect_policy_t *policy);
 static ngx_int_t ngx_http_health_detect_add_or_update_node_on_shm(
     ngx_health_detect_detect_policy_t *policy);
 ngx_int_t ngx_http_health_detect_delete_node(ngx_str_t *key);
@@ -2436,7 +2436,7 @@ ngx_http_health_detect_sync_peers_shm_to_peers()
                     peer_name, ngx_pid);
 
                 ngx_http_health_detect_add_or_update_node_on_local(
-                    &peer_shm->policy, 1);
+                   NULL, &peer_shm->policy, 1);
             }
         }
     }
