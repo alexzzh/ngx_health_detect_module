@@ -2229,7 +2229,7 @@ ngx_stream_health_detect_upstream_check_peer_down(
             "check stream upstream peer(%V) down flag(%ui)", &full_name, rc);
 
     } else {
-        rc = 1;
+        rc = 0;
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
             "check stream upstream peer(%V) not found, down flag(%ui)",
             &full_name, rc);
