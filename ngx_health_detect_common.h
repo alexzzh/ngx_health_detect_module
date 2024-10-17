@@ -119,6 +119,7 @@ typedef struct {
     ngx_peer_connection_t pc;
     ngx_health_detect_detect_policy_t *policy;
     ngx_pool_t *temp_pool;
+    ngx_uint_t using_cf_pool;
 
     ngx_health_detect_default_detect_policy_t *default_policy;
     void *check_data;

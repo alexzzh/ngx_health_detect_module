@@ -6,7 +6,7 @@
 #include <ngx_stream.h>
 
 ngx_uint_t ngx_stream_health_detect_upstream_add_peer(
-    ngx_stream_upstream_srv_conf_t *us, ngx_str_t *server,
+    ngx_pool_t *pool, ngx_stream_upstream_srv_conf_t *us, ngx_str_t *server,
     ngx_addr_t *peer_addr);
 
 void ngx_stream_health_detect_upstream_delete_peer(
