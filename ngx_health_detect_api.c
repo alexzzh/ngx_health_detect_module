@@ -46,7 +46,7 @@ ngx_rbtree_node_t *ngx_http_health_detect_peers_shm_rbtree_lookup(
 ngx_health_detect_default_detect_policy_t *
 ngx_http_health_detect_get_default_detect_policy(ngx_uint_t type);
 ngx_int_t ngx_http_health_detect_add_or_update_node(
-    ngx_health_detect_detect_policy_t *policy);
+    ngx_pool_t * pool, ngx_health_detect_detect_policy_t *policy);
 ngx_int_t ngx_http_health_detect_delete_node(ngx_str_t *key);
 ngx_int_t ngx_http_health_detect_delete_all_node();
 ngx_uint_t ngx_http_health_detect_get_down_count();
@@ -774,7 +774,7 @@ ngx_health_detect_add_or_update_node(ngx_http_request_t *r, void *data)
     apicf = ngx_http_get_module_loc_conf(r, ngx_health_detect_api_module);
 
     if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-        rc = ngx_http_health_detect_add_or_update_node(policy);
+        rc = ngx_http_health_detect_add_or_update_node(NULL,policy);
     } else {
         rc = ngx_stream_health_detect_add_or_update_node(policy);
     }

@@ -1362,7 +1362,7 @@ ngx_http_health_detect_add_or_update_node_on_local(
             "on local: op(add/update) create pool error");
         }
     } else {
-       temp_pool = pool;
+       temp_pool = pool; 
     }
 
     node = ngx_pcalloc(temp_pool, peer_size);
