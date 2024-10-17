@@ -271,7 +271,7 @@ index ae3bf37a6..9fdde0243 100644
  
 +#if (NGX_STREAM_HEALTH_DETECT)
 +                if (!server[i].down) {
-+                    ngx_stream_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                    ngx_stream_health_detect_upstream_add_peer(cf->pool, us, &server[i].name, &server[i].addrs[j]);
 +                }
 +#endif
 +
@@ -284,7 +284,7 @@ index ae3bf37a6..9fdde0243 100644
  
 +#if (NGX_STREAM_HEALTH_DETECT)
 +                if (!server[i].down) {
-+                    ngx_stream_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                    ngx_stream_health_detect_upstream_add_peer(cf->pool, us, &server[i].name, &server[i].addrs[j]);
 +                }
 +#endif
 +

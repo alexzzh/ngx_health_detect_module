@@ -1488,8 +1488,6 @@ ngx_http_health_detect_free_node(ngx_rbtree_node_t *node)
     ngx_rbtree_delete(&peers_manager_ctx->peers->rbtree, node);
 
     if (peer->temp_pool != NULL && !peer->using_cf_pool) {
-         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-            "free pool");
         ngx_destroy_pool(peer->temp_pool);
     }
 }
