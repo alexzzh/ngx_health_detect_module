@@ -178,7 +178,7 @@ stream {
 
 `语法` 
 > {"type":"tcp|http","peer_addr":"ip:port","send_content":"xxx","alert_method":"log|syslog","expect_response_status":"http_2xx|http_3xx|http_4xx|http_5xx","interval":milliseconds,"timeout":milliseconds , "keepalive": "true"|"false", "keepalive_time": milliseconds , "rise":count, "fall":count, "default_down": "true"|"false"}
-
+  
 > 只有"type" 和 "peer_addr"是`必选`字段，其他字段不指定时使用默认值
 
 `默认值`: 
@@ -224,8 +224,8 @@ restful api接口说明
 ip:port/http_api/control?cmd=add&name=node_name
 ip:port/http_api/control?cmd=delete&name=node_name
 ip:port/http_api/control?cmd=delete_all
-ip:port/http_api/control?cmd=status&name=node_name[&format=json|html|prometheus]
-ip:port/http_api/control?cmd=status_all[&status=down|up][&format=json|html|prometheus]
+ip:port/http_api/control?cmd=status&name=node_name[&format=json|html]
+ip:port/http_api/control?cmd=status_all[&status=down|up][&format=json|html]
 ```
 - 增加后端节点
 ``` python
@@ -269,27 +269,7 @@ curl http://10.0.229.99:641/http_api/control?cmd=status_all
 curl http://10.0.229.99:641/http_api/control?cmd=status_all&format=html
 ```
 ![check_all_node](pic/check_all_node-html.png)
-
-- 查询所有后端节点当前状态，输出格式: prometheus
-
-```shell
-curl 'http://10.0.229.99:641/http_api/control?cmd=status_all&format=prometheus'
-
-# HELP nginx_upstream_count_total Nginx total number of servers
-# TYPE nginx_upstream_count_total gauge
-nginx_upstream_count_total 2
-# HELP nginx_upstream_count_up Nginx total number of servers that are UP
-# TYPE nginx_upstream_count_up gauge
-nginx_upstream_count_up 1
-# HELP nginx_upstream_count_down Nginx total number of servers that are DOWN
-# TYPE nginx_upstream_count_down gauge
-nginx_upstream_count_down 1
-# HELP nginx_upstream_server Nginx upstream status
-# TYPE nginx_upstream_server counter
-nginx_upstream_server{upstream="nginx81",status="up"}
-nginx_upstream_server{upstream="nginx66",status="down"}
-```
-
+ 
 - 查询单个后端节点的探测策略以及历史状态，输出格式: json 
 
 ```python
@@ -322,16 +302,6 @@ curl http://10.0.229.99:641/http_api/control?cmd=status\&name=nginx100
 curl http://10.0.229.99:641/http_api/control?cmd=status\&name=nginx100\&format=html
 ```
 ![check_one_node](pic/check_one_node-html.png)
-
-- 查询单个后端节点的探测策略以及历史状态，输出格式:prometheus
-
-```shell
-curl http://10.0.229.99:641/http_api/control?cmd=status&name=nginx66&format=prometheus
-
-nginx_upstream_server {upstream_type="http",upstream="nginx66",peer_addr="10.0.229.100:30100",alert_method="tcp",expect_response_status="",check_interval="2000",check_timeout="1000",need_keepalive="0",keepalive_time="3600000",rise="3",fall="5",send_content="",access_time="2024/11/04 16:06:48",latest_status="up"}
-```
-
-
 
 [Back to TOC](#table-of-contents)
 
@@ -480,7 +450,7 @@ MemFree:         3156588 kB
 
 版权和许可
 =====================
-
+    
 This module is licensed under the BSD license.
 
 Copyright (C) 2023, by Alex zhang <zzhcore@163.com>

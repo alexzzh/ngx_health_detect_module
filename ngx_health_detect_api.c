@@ -93,11 +93,6 @@ static void ngx_http_health_detect_all_status_html_format(ngx_http_request_t *r,
     ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers, ngx_uint_t status_flag);
 static void ngx_http_health_detect_one_status_html_format(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer);
-static void ngx_http_health_detect_all_status_prometheus_format(
-    ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers,
-    ngx_uint_t status_flag);
-static void ngx_http_health_detect_one_status_prometheus_format(
-    ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer);
 
 static ngx_int_t ngx_health_detect_add_or_update_node(
     ngx_http_request_t *r, void *data);
@@ -138,9 +133,6 @@ static ngx_health_detect_api_format_ctx_t ngx_health_detect_status_formats[] = {
     {ngx_string("html"), ngx_string("text/html"),
         ngx_http_health_detect_one_status_html_format,
         ngx_http_health_detect_all_status_html_format},
-    {ngx_string("prometheus"), ngx_string("text/plain;charset=utf-8"),
-        ngx_http_health_detect_one_status_prometheus_format,
-        ngx_http_health_detect_all_status_prometheus_format},
     {ngx_null_string, ngx_null_string, NULL, NULL}};
 
 static ngx_health_detect_api_format_ctx_t *
@@ -383,8 +375,7 @@ ngx_stream_health_detect_api_mode(
     }
 
     if (!apilcf) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid value apilcf");
-        return NGX_CONF_ERROR;
+      return NGX_CONF_ERROR;
     }
 
     if (apilcf->used_module == NGX_CONF_UNSET_UINT) {
@@ -771,142 +762,6 @@ ngx_http_health_detect_all_status_html_format(ngx_http_request_t *r,
         "</table>\n"
         "</body>\n"
         "</html>\n");
-}
-
-static void
-ngx_http_rbtree_traverse_all_status_prometheus_format(
-    ngx_rbtree_node_t *node_shm, ngx_rbtree_node_t *sentinel, ngx_buf_t *b,
-    ngx_uint_t status_flag, u_char *items_start)
-{
-    ngx_health_detect_peer_shm_t *peer_shm;
-    ngx_uint_t need_print;
-
-    if (node_shm == sentinel) {
-        return;
-    }
-
-    ngx_http_rbtree_traverse_all_status_prometheus_format(
-        node_shm->left, sentinel, b, status_flag, items_start);
-
-    need_print = 1;
-    peer_shm = (ngx_health_detect_peer_shm_t *) (&node_shm->color);
-    if ((status_flag & NGX_CHECK_STATUS_DOWN) ||
-        (status_flag & NGX_CHECK_STATUS_UP)) {
-        if (status_flag != peer_shm->status.latest_status) {
-            need_print = 0;
-        }
-    }
-
-    if (need_print) {
-        b->last = ngx_snprintf(b->last, b->end - b->last,
-            "nginx_upstream_server{upstream=\"%V\",status=\"%s\"}\n",
-            &peer_shm->policy.peer_name,
-            peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? "up"
-                                                                  : "down");
-    }
-
-    ngx_http_rbtree_traverse_all_status_prometheus_format(
-        node_shm->right, sentinel, b, status_flag, items_start);
-}
-
-static void
-ngx_http_health_detect_all_status_prometheus_format(ngx_http_request_t *r,
-    ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers_shm,
-    ngx_uint_t status_flag)
-{
-    ngx_rbtree_node_t *node_shm, *sentinel;
-    ngx_uint_t down_count;
-    ngx_http_health_detect_api_loc_conf_t *apicf;
-
-    apicf = ngx_http_get_module_loc_conf(r, ngx_health_detect_api_module);
-
-    node_shm = peers_shm->rbtree.root;
-    sentinel = peers_shm->rbtree.sentinel;
-
-
-    if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-        down_count = ngx_http_health_detect_get_down_count();
-    } else {
-        down_count = ngx_stream_health_detect_get_down_count();
-    }
-
-    b->last = ngx_snprintf(b->last, b->end - b->last,
-        "# HELP nginx_upstream_count_total Nginx total number of servers\n"
-        "# TYPE nginx_upstream_count_total gauge\n"
-        "nginx_upstream_count_total %ui\n"
-        "# HELP nginx_upstream_count_up Nginx total number of servers that "
-        "are "
-        "UP\n"
-        "# TYPE nginx_upstream_count_up gauge\n"
-        "nginx_upstream_count_up %ui\n"
-        "# HELP nginx_upstream_count_down Nginx total number of servers "
-        "that "
-        "are DOWN\n"
-        "# TYPE nginx_upstream_count_down gauge\n"
-        "nginx_upstream_count_down %ui\n",
-        peers_shm->number, peers_shm->number - down_count, down_count);
-    b->last = ngx_snprintf(b->last, b->end - b->last,
-        "# HELP nginx_upstream_server Nginx upstream status\n"
-        "# TYPE nginx_upstream_server counter\n");
-    
-    ngx_http_rbtree_traverse_all_status_prometheus_format(
-        node_shm, sentinel, b, status_flag, b->last);
-}
-
-static void
-ngx_http_health_detect_one_status_prometheus_format(
-    ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer_shm)
-{
-    char user_define_cond_str[80];
-    ngx_str_t *send_content;
-    ngx_http_health_detect_api_loc_conf_t *apicf;
-
-    apicf = ngx_http_get_module_loc_conf(r, ngx_health_detect_api_module);
-
-    ngx_memzero(user_define_cond_str, sizeof(user_define_cond_str));
-    ngx_health_detect_judge_cond_to_string(user_define_cond_str,
-        peer_shm->policy.data.expect_response_status.http_status);
-
-    if (peer_shm->policy.send_content.len == 0) {
-        if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-            send_content = &ngx_http_health_detect_get_default_detect_policy(
-                peer_shm->policy.data.type)
-                                ->default_send_content;
-        } else {
-            send_content = &ngx_stream_health_detect_get_default_detect_policy(
-                peer_shm->policy.data.type)
-                                ->default_send_content;
-        }
-    } else {
-        send_content = &peer_shm->policy.send_content;
-    }
-
-    b->last = ngx_snprintf(b->last, b->end - b->last,
-        "nginx_upstream_server {upstream_type=\"%s\","
-        "upstream=\"%V\","
-        "peer_addr=\"%V\","
-        "alert_method=\"%s\","
-        "expect_response_status=\"%s\","
-        "check_interval=\"%ui\","
-        "check_timeout=\"%ui\","
-        "need_keepalive=\"%ui\","
-        "keepalive_time=\"%ui\","
-        "rise=\"%ui\","
-        "fall=\"%ui\","
-        "send_content=\"%V\","
-        "access_time=\"%V\","
-        "latest_status=\"%s\"}",
-        apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP ? "http" : "stream",
-        &peer_shm->policy.peer_name, &peer_shm->policy.peer_addr.name,
-        ngx_health_detect_api_get_policy_type_to_string(
-            peer_shm->policy.data.alert_method),
-        user_define_cond_str, peer_shm->policy.data.check_interval,
-        peer_shm->policy.data.check_timeout,
-        peer_shm->policy.data.need_keepalive,
-        peer_shm->policy.data.keepalive_time, peer_shm->policy.data.rise,
-        peer_shm->policy.data.fall, send_content,
-        &peer_shm->status.latest_access_time,
-        peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? "up" : "down");
 }
 
 static ngx_int_t
