@@ -67,6 +67,7 @@ typedef struct {
     ngx_uint_t check_only;
     ngx_uint_t stream_check_only;
     ngx_uint_t used_module;
+    ngx_uint_t http_and_stream;
 } ngx_http_health_detect_api_loc_conf_t;
 
 static ngx_int_t ngx_health_detect_api_handler(ngx_http_request_t *r);
@@ -83,19 +84,21 @@ typedef void (*ngx_health_detect_api_one_node_status_format_pt)(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer);
 typedef void (*ngx_health_detect_api_all_node_status_format_pt)(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peers_shm_t *peer,
-    ngx_uint_t status_flag);
+    ngx_uint_t status_flag, ngx_uint_t upstream_type);
 
 static void ngx_http_health_detect_all_status_json_format(ngx_http_request_t *r,
-    ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers, ngx_uint_t status_flag);
+    ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers, ngx_uint_t status_flag,
+    ngx_uint_t upstream_type);
 static void ngx_http_health_detect_one_status_json_format(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer);
 static void ngx_http_health_detect_all_status_html_format(ngx_http_request_t *r,
-    ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers, ngx_uint_t status_flag);
+    ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers, ngx_uint_t status_flag,
+    ngx_uint_t upstream_type);
 static void ngx_http_health_detect_one_status_html_format(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer);
 static void ngx_http_health_detect_all_status_prometheus_format(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers,
-    ngx_uint_t status_flag);
+    ngx_uint_t status_flag, ngx_uint_t upstream_type);
 static void ngx_http_health_detect_one_status_prometheus_format(
     ngx_http_request_t *r, ngx_buf_t *b, ngx_health_detect_peer_shm_t *peer);
 
@@ -219,6 +222,10 @@ static ngx_command_t ngx_http_health_detect_api_cmds[] = {
         NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1 |
             NGX_CONF_NOARGS,
         ngx_stream_health_detect_api_mode, 0, 0, NULL},
+    {ngx_string("healthcheck_status"),
+        NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1 |
+            NGX_CONF_NOARGS,
+        ngx_stream_health_detect_api_mode, 0, 0, NULL},
     ngx_null_command};
 
 static ngx_http_module_t ngx_health_detect_api_modules_ctx = {
@@ -251,6 +258,7 @@ ngx_health_detect_api_create_loc_conf(ngx_conf_t *cf)
     apilcf->check_only = NGX_CONF_UNSET_UINT;
     apilcf->stream_check_only = NGX_CONF_UNSET_UINT;
     apilcf->used_module = NGX_CONF_UNSET_UINT;
+    apilcf->http_and_stream = NGX_CONF_UNSET_UINT;
 
     return apilcf;
 }
@@ -265,6 +273,7 @@ ngx_health_detect_api_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(
         conf->stream_check_only, prev->stream_check_only, 1);
     ngx_conf_merge_uint_value(conf->used_module, prev->used_module, 0);
+    ngx_conf_merge_uint_value(conf->http_and_stream, prev->http_and_stream, 0);
 
     if ((conf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) &&
         (conf->used_module & NGX_HEALTH_DETECT_API_ON_TCP)) {
@@ -293,6 +302,22 @@ ngx_http_health_detect_api_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
 
     clcf->handler = ngx_health_detect_api_handler;
+    if (ngx_strncmp(value->data, "healthcheck_status", 18) == 0) {
+        apilcf =
+            ngx_http_conf_get_module_loc_conf(cf, ngx_health_detect_api_module);
+        if (!apilcf) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid value apilcf");
+            return NGX_CONF_ERROR;
+        }
+
+        if (apilcf->used_module == NGX_CONF_UNSET_UINT) {
+            apilcf->used_module = 0;
+        }
+
+        apilcf->used_module |= NGX_HEALTH_DETECT_API_ON_HTTP;
+        apilcf->http_and_stream = 1;
+        return NGX_CONF_OK;
+    }
 
     if (cf->args->nelts == 2) {
         apilcf =
@@ -325,7 +350,7 @@ ngx_http_health_detect_api_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     if (!apilcf) {
-      return NGX_CONF_ERROR;
+        return NGX_CONF_ERROR;
     }
 
     if (apilcf->used_module == NGX_CONF_UNSET_UINT) {
@@ -351,6 +376,23 @@ ngx_stream_health_detect_api_mode(
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
 
     clcf->handler = ngx_health_detect_api_handler;
+
+    if (ngx_strncmp(value->data, "healthcheck_status", 18) == 0) {
+        apilcf =
+            ngx_http_conf_get_module_loc_conf(cf, ngx_health_detect_api_module);
+        if (!apilcf) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid value apilcf");
+            return NGX_CONF_ERROR;
+        }
+
+        if (apilcf->used_module == NGX_CONF_UNSET_UINT) {
+            apilcf->used_module = 0;
+        }
+
+        apilcf->used_module |= NGX_HEALTH_DETECT_API_ON_HTTP;
+        apilcf->http_and_stream = 1;
+        return NGX_CONF_OK;
+    }
 
     if (cf->args->nelts == 2) {
         apilcf =
@@ -419,7 +461,7 @@ ngx_health_detect_judge_cond_to_string(
 static void
 ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
     ngx_rbtree_node_t *sentinel, ngx_buf_t *b, ngx_uint_t status_flag,
-    u_char *items_start)
+    u_char *items_start, ngx_uint_t upstream_type)
 {
     ngx_health_detect_peer_shm_t *peer_shm;
     ngx_uint_t need_print;
@@ -429,8 +471,7 @@ ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
     }
 
     ngx_http_rbtree_traverse_all_status_json_format(
-        node_shm->left, sentinel, b, status_flag,
-        items_start);
+        node_shm->left, sentinel, b, status_flag, items_start, upstream_type);
 
     need_print = 1;
     peer_shm = (ngx_health_detect_peer_shm_t *) (&node_shm->color);
@@ -444,23 +485,23 @@ ngx_http_rbtree_traverse_all_status_json_format(ngx_rbtree_node_t *node_shm,
     if (need_print) {
         b->last = ngx_snprintf(b->last, b->end - b->last,
             "%s  {\"name\":\"%V\", \"addr\":\"%V\", \"access_time\":\"%V\", "
-            "\"status\":\"%s\"}",
-            b->last > items_start ? ",\n" : "",
-            &peer_shm->policy.peer_name, &peer_shm->policy.peer_addr.name,
+            "\"status\":\"%s\", \"type\":\"%s\"}",
+            b->last > items_start ? ",\n" : "", &peer_shm->policy.peer_name,
+            &peer_shm->policy.peer_addr.name,
             &peer_shm->status.latest_access_time,
             peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? "up"
-                                                                  : "down");
+                                                                  : "down",
+            upstream_type & NGX_HEALTH_DETECT_API_ON_HTTP ? "http" : "stream");
     }
 
     ngx_http_rbtree_traverse_all_status_json_format(
-        node_shm->right, sentinel, b, status_flag,
-        items_start);
+        node_shm->right, sentinel, b, status_flag, items_start, upstream_type);
 }
 
 static void
 ngx_http_health_detect_all_status_json_format(ngx_http_request_t *r,
     ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers_shm,
-    ngx_uint_t status_flag)
+    ngx_uint_t status_flag, ngx_uint_t upstream_type)
 {
     ngx_rbtree_node_t *node_shm, *sentinel;
     ngx_uint_t down_count;
@@ -471,23 +512,27 @@ ngx_http_health_detect_all_status_json_format(ngx_http_request_t *r,
     node_shm = peers_shm->rbtree.root;
     sentinel = peers_shm->rbtree.sentinel;
 
-    if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-        down_count = ngx_http_health_detect_get_down_count();
-    } else {
-        down_count = ngx_stream_health_detect_get_down_count();
+    if (apicf->http_and_stream != 1) {
+        if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
+            down_count = ngx_http_health_detect_get_down_count();
+        } else {
+            down_count = ngx_stream_health_detect_get_down_count();
+        }
+
+        b->last = ngx_snprintf(b->last, b->end - b->last,
+            "{\n \"total\": %ui,\n \"up\": %ui,\n \"down\": %ui,"
+            "\n \"max\": %ui,\n \"items\": [\n",
+            peers_shm->number, peers_shm->number - down_count, down_count,
+            peers_shm->max_number);
     }
 
-    b->last = ngx_snprintf(b->last, b->end - b->last,
-        "{\n \"total\": %ui,\n \"up\": %ui,\n \"down\": %ui,"
-        "\n \"max\": %ui,\n \"items\": [\n",
-        peers_shm->number, peers_shm->number - down_count, down_count,
-        peers_shm->max_number);
-
     ngx_http_rbtree_traverse_all_status_json_format(
-        node_shm, sentinel, b, status_flag, b->last);
+        node_shm, sentinel, b, status_flag, b->last, upstream_type);
 
-    b->last = ngx_snprintf(b->last, b->end - b->last, "\n ]\n");
-    b->last = ngx_snprintf(b->last, b->end - b->last, "}\n");
+    if (apicf->http_and_stream != 1) {
+        b->last = ngx_snprintf(b->last, b->end - b->last, "\n ]\n");
+        b->last = ngx_snprintf(b->last, b->end - b->last, "}\n");
+    }
 }
 
 static void
@@ -692,7 +737,8 @@ ngx_http_health_detect_one_status_html_format(
 
 static void
 ngx_http_rbtree_traverse_all_status_html_format(ngx_rbtree_node_t *node_shm,
-    ngx_rbtree_node_t *sentinel, ngx_buf_t *b, ngx_uint_t status_flag)
+    ngx_rbtree_node_t *sentinel, ngx_buf_t *b, ngx_uint_t status_flag,
+    ngx_uint_t upstream_type)
 {
     ngx_health_detect_peer_shm_t *peer_shm;
     ngx_uint_t need_print;
@@ -702,7 +748,7 @@ ngx_http_rbtree_traverse_all_status_html_format(ngx_rbtree_node_t *node_shm,
     }
 
     ngx_http_rbtree_traverse_all_status_html_format(
-        node_shm->left, sentinel, b, status_flag);
+        node_shm->left, sentinel, b, status_flag, upstream_type);
 
     need_print = 1;
     peer_shm = (ngx_health_detect_peer_shm_t *) (&node_shm->color);
@@ -720,21 +766,23 @@ ngx_http_rbtree_traverse_all_status_html_format(ngx_rbtree_node_t *node_shm,
             " <td>%V</td>\n"
             " <td>%V</td>\n"
             " <td>%s</td>\n"
+            " <td>%s</td>\n"
             "  <tr>\n",
             &peer_shm->policy.peer_name, &peer_shm->policy.peer_addr.name,
             &peer_shm->status.latest_access_time,
             peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? "up"
-                                                                  : "down");
+                                                                  : "down",
+            upstream_type & NGX_HEALTH_DETECT_API_ON_HTTP ? "http" : "stream");
     }
 
     ngx_http_rbtree_traverse_all_status_html_format(
-        node_shm->right, sentinel, b, status_flag);
+        node_shm->right, sentinel, b, status_flag, upstream_type);
 }
 
 static void
 ngx_http_health_detect_all_status_html_format(ngx_http_request_t *r,
     ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers_shm,
-    ngx_uint_t status_flag)
+    ngx_uint_t status_flag, ngx_uint_t upstream_type)
 {
     ngx_rbtree_node_t *node_shm, *sentinel;
     ngx_uint_t down_count;
@@ -760,12 +808,13 @@ ngx_http_health_detect_all_status_html_format(ngx_http_request_t *r,
         "    <td class=\"column\"\">addr</td>\n"
         "    <td class=\"column\"\">access_time</td>\n"
         "    <td class=\"column\"\">status</td>\n"
+        "    <td class=\"column\"\">upstream_type</td>\n"
         "  </tr>\n",
         peers_shm->number, peers_shm->number - down_count, down_count,
         peers_shm->max_number);
 
     ngx_http_rbtree_traverse_all_status_html_format(
-        node_shm, sentinel, b, status_flag);
+        node_shm, sentinel, b, status_flag, upstream_type);
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
         "</table>\n"
@@ -776,7 +825,7 @@ ngx_http_health_detect_all_status_html_format(ngx_http_request_t *r,
 static void
 ngx_http_rbtree_traverse_all_status_prometheus_format(
     ngx_rbtree_node_t *node_shm, ngx_rbtree_node_t *sentinel, ngx_buf_t *b,
-    ngx_uint_t status_flag, u_char *items_start)
+    ngx_uint_t status_flag, u_char *items_start, ngx_uint_t upstream_type)
 {
     ngx_health_detect_peer_shm_t *peer_shm;
     ngx_uint_t need_print;
@@ -786,7 +835,7 @@ ngx_http_rbtree_traverse_all_status_prometheus_format(
     }
 
     ngx_http_rbtree_traverse_all_status_prometheus_format(
-        node_shm->left, sentinel, b, status_flag, items_start);
+        node_shm->left, sentinel, b, status_flag, items_start, upstream_type);
 
     need_print = 1;
     peer_shm = (ngx_health_detect_peer_shm_t *) (&node_shm->color);
@@ -799,20 +848,22 @@ ngx_http_rbtree_traverse_all_status_prometheus_format(
 
     if (need_print) {
         b->last = ngx_snprintf(b->last, b->end - b->last,
-            "nginx_upstream_server{upstream=\"%V\",status=\"%s\"}\n",
+            "nginx_upstream_server{upstream_type=\"%s\",upstream=\"%V\",status="
+            "\"%s\"}\n",
+            upstream_type & NGX_HEALTH_DETECT_API_ON_HTTP ? "http" : "stream",
             &peer_shm->policy.peer_name,
             peer_shm->status.latest_status == NGX_CHECK_STATUS_UP ? "up"
                                                                   : "down");
     }
 
     ngx_http_rbtree_traverse_all_status_prometheus_format(
-        node_shm->right, sentinel, b, status_flag, items_start);
+        node_shm->right, sentinel, b, status_flag, items_start, upstream_type);
 }
 
 static void
 ngx_http_health_detect_all_status_prometheus_format(ngx_http_request_t *r,
     ngx_buf_t *b, ngx_health_detect_peers_shm_t *peers_shm,
-    ngx_uint_t status_flag)
+    ngx_uint_t status_flag, ngx_uint_t upstream_type)
 {
     ngx_rbtree_node_t *node_shm, *sentinel;
     ngx_uint_t down_count;
@@ -823,34 +874,34 @@ ngx_http_health_detect_all_status_prometheus_format(ngx_http_request_t *r,
     node_shm = peers_shm->rbtree.root;
     sentinel = peers_shm->rbtree.sentinel;
 
+    if (apicf->http_and_stream != 1) {
+        if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
+            down_count = ngx_http_health_detect_get_down_count();
+        } else {
+            down_count = ngx_stream_health_detect_get_down_count();
+        }
 
-    if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-        down_count = ngx_http_health_detect_get_down_count();
-    } else {
-        down_count = ngx_stream_health_detect_get_down_count();
+        b->last = ngx_snprintf(b->last, b->end - b->last,
+            "# HELP nginx_upstream_count_total Nginx total number of servers\n"
+            "# TYPE nginx_upstream_count_total gauge\n"
+            "nginx_upstream_count_total %ui\n"
+            "# HELP nginx_upstream_count_up Nginx total number of servers that "
+            "are "
+            "UP\n"
+            "# TYPE nginx_upstream_count_up gauge\n"
+            "nginx_upstream_count_up %ui\n"
+            "# HELP nginx_upstream_count_down Nginx total number of servers "
+            "that "
+            "are DOWN\n"
+            "# TYPE nginx_upstream_count_down gauge\n"
+            "nginx_upstream_count_down %ui\n",
+            peers_shm->number, peers_shm->number - down_count, down_count);
+        b->last = ngx_snprintf(b->last, b->end - b->last,
+            "# HELP nginx_upstream_server Nginx upstream status\n"
+            "# TYPE nginx_upstream_server counter\n");
     }
-
-    b->last = ngx_snprintf(b->last, b->end - b->last,
-        "# HELP nginx_upstream_count_total Nginx total number of servers\n"
-        "# TYPE nginx_upstream_count_total gauge\n"
-        "nginx_upstream_count_total %ui\n"
-        "# HELP nginx_upstream_count_up Nginx total number of servers that "
-        "are "
-        "UP\n"
-        "# TYPE nginx_upstream_count_up gauge\n"
-        "nginx_upstream_count_up %ui\n"
-        "# HELP nginx_upstream_count_down Nginx total number of servers "
-        "that "
-        "are DOWN\n"
-        "# TYPE nginx_upstream_count_down gauge\n"
-        "nginx_upstream_count_down %ui\n",
-        peers_shm->number, peers_shm->number - down_count, down_count);
-    b->last = ngx_snprintf(b->last, b->end - b->last,
-        "# HELP nginx_upstream_server Nginx upstream status\n"
-        "# TYPE nginx_upstream_server counter\n");
-    
     ngx_http_rbtree_traverse_all_status_prometheus_format(
-        node_shm, sentinel, b, status_flag, b->last);
+        node_shm, sentinel, b, status_flag, b->last, upstream_type);
 }
 
 static void
@@ -1011,24 +1062,12 @@ ngx_health_detect_create_temp_response_buf(
 }
 
 static ngx_int_t
-ngx_health_detect_check_all_node_status(ngx_http_request_t *r, void *data)
+ngx_health_detect_check_get_node_status_by_peers(ngx_http_request_t *r,
+    ngx_health_detect_peers_manager_t *peers_manager_ctx, ngx_buf_t *b,
+    ngx_uint_t upstream_type)
 {
-    ngx_int_t rc;
-    size_t buffer_size;
-    ngx_buf_t *b;
-    ngx_chain_t *out_chain;
     ngx_slab_pool_t *shpool;
     ngx_health_detect_api_status_ctx_t *ctx;
-    ngx_http_health_detect_api_loc_conf_t *apicf;
-    ngx_health_detect_peers_manager_t *peers_manager_ctx;
-
-    apicf = ngx_http_get_module_loc_conf(r, ngx_health_detect_api_module);
-
-    if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-        peers_manager_ctx = http_peers_manager_ctx;
-    } else {
-        peers_manager_ctx = stream_peers_manager_ctx;
-    }
 
     shpool = peers_manager_ctx->peers_shm->shpool;
 
@@ -1044,12 +1083,132 @@ ngx_health_detect_check_all_node_status(ngx_http_request_t *r, void *data)
     }
     r->headers_out.content_type = ctx->format->content_type;
 
+    ngx_shmtx_lock(&shpool->mutex);
+    ctx->format->all_node_output(
+        r, b, peers_manager_ctx->peers_shm, ctx->flag, upstream_type);
+    ngx_shmtx_unlock(&shpool->mutex);
+
+    return NGX_HTTP_OK;
+}
+
+static ngx_int_t
+ngx_health_detect_check_all_node_status(ngx_http_request_t *r, void *data)
+{
+    ngx_int_t rc;
+    ngx_buf_t *b;
+    ngx_chain_t *out_chain;
+    size_t buffer_size;
+    ngx_http_health_detect_api_loc_conf_t *apicf;
+    ngx_health_detect_peers_manager_t *peers_manager_ctx;
+    ngx_health_detect_api_status_ctx_t *ctx;
+
+    b = NULL;
+    apicf = ngx_http_get_module_loc_conf(r, ngx_health_detect_api_module);
+
+    if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
+        peers_manager_ctx = http_peers_manager_ctx;
+    } else {
+        peers_manager_ctx = stream_peers_manager_ctx;
+    }
+
+    ctx = ngx_pcalloc(r->pool, sizeof(ngx_health_detect_api_status_ctx_t));
+    if (ctx == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+    ngx_health_detect_api_parse_args(r, ctx);
+
+    if (ctx->format == NULL) {
+        ctx->format = &ngx_health_detect_status_formats[0];
+    }
+    r->headers_out.content_type = ctx->format->content_type;
+
     buffer_size = ngx_pagesize * 512;
     b = ngx_create_temp_buf(r->pool, buffer_size);
+    if (b == NULL) {
+        ngx_log_error(
+            NGX_LOG_ERR, r->connection->log, 0, "ngx_create_temp_buf fail");
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
 
-    ngx_shmtx_lock(&shpool->mutex);
-    ctx->format->all_node_output(r, b, peers_manager_ctx->peers_shm, ctx->flag);
-    ngx_shmtx_unlock(&shpool->mutex);
+    if (apicf->http_and_stream) {
+        ngx_uint_t total = http_peers_manager_ctx != NULL
+                               ? http_peers_manager_ctx->peers_shm->number
+                           : 0 + stream_peers_manager_ctx != NULL
+                               ? stream_peers_manager_ctx->peers_shm->number
+                               : 0;
+        ngx_uint_t http_down_count =
+            http_peers_manager_ctx != NULL
+                ? ngx_http_health_detect_get_down_count()
+                : 0;
+        ngx_uint_t tcp_down_count =
+            stream_peers_manager_ctx != NULL
+                ? ngx_stream_health_detect_get_down_count()
+                : 0;
+        ngx_uint_t max_number =
+            http_peers_manager_ctx != NULL
+                ? http_peers_manager_ctx->peers_shm->max_number
+            : 0 + stream_peers_manager_ctx != NULL
+                ? stream_peers_manager_ctx->peers_shm->max_number
+                : 0;
+        if (ngx_strncmp(ctx->format->format.data, "json", 4) == 0) {
+            b->last = ngx_snprintf(b->last, b->end - b->last,
+                "{\n \"total\": %ui,\n \"up\": %ui,\n \"down\": %ui,"
+                "\n \"max\": %ui,\n \"http\": [\n",
+                total, total - tcp_down_count - http_down_count,
+                http_down_count + tcp_down_count, max_number);
+        } else if (ngx_strncmp(ctx->format->format.data, "prometheus", 10) ==
+                   0) {
+            b->last = ngx_snprintf(b->last, b->end - b->last,
+                "# HELP nginx_upstream_count_total Nginx total number of "
+                "servers\n"
+                "# TYPE nginx_upstream_count_total gauge\n"
+                "nginx_upstream_count_total %ui\n"
+                "# HELP nginx_upstream_count_up Nginx total number of servers "
+                "that are "
+                "UP\n"
+                "# TYPE nginx_upstream_count_up gauge\n"
+                "nginx_upstream_count_up %ui\n"
+                "# HELP nginx_upstream_count_down Nginx total number of "
+                "servers that "
+                "are DOWN\n"
+                "# TYPE nginx_upstream_count_down gauge\n"
+                "nginx_upstream_count_down %ui\n",
+                total, total - tcp_down_count - http_down_count,
+                http_down_count + tcp_down_count);
+            b->last = ngx_snprintf(b->last, b->end - b->last,
+                "# HELP nginx_upstream_server Nginx upstream status\n"
+                "# TYPE nginx_upstream_server counter\n");
+        }
+        if (http_peers_manager_ctx) {
+            rc = ngx_health_detect_check_get_node_status_by_peers(
+                r, http_peers_manager_ctx, b, NGX_HEALTH_DETECT_API_ON_HTTP);
+            if (rc != NGX_HTTP_OK) {
+                return rc;
+            }
+        }
+        if (ngx_strncmp(ctx->format->format.data, "json", 4) == 0) {
+            b->last = ngx_snprintf(b->last, b->end - b->last, "\n ],\n");
+            b->last =
+                ngx_snprintf(b->last, b->end - b->last, "\"stream\": [\n");
+        }
+        if (stream_peers_manager_ctx) {
+            rc = ngx_health_detect_check_get_node_status_by_peers(
+                r, stream_peers_manager_ctx, b, NGX_HEALTH_DETECT_API_ON_TCP);
+            if (rc != NGX_HTTP_OK) {
+                return rc;
+            }
+        }
+        if (ngx_strncmp(ctx->format->format.data, "json", 4) == 0) {
+            b->last = ngx_snprintf(b->last, b->end - b->last, "\n ]\n");
+            b->last = ngx_snprintf(b->last, b->end - b->last, "}\n");
+        }
+    } else {
+        rc = ngx_health_detect_check_get_node_status_by_peers(
+            r, peers_manager_ctx, b, apicf->used_module);
+        if (rc != NGX_HTTP_OK) {
+            return rc;
+        }
+    }
 
     rc = NGX_HTTP_OK;
     b->last_buf = 1;
@@ -1781,26 +1940,31 @@ ngx_health_detect_api_handler(ngx_http_request_t *r)
         }
     }
 
-    rc = ngx_health_detect_api_check_url_valid(r, &arg_cmd, &resp);
-    if (rc != NGX_HTTP_OK) {
-        goto out;
-    }
+    if (apicf->http_and_stream != 1) {
+        rc = ngx_health_detect_api_check_url_valid(r, &arg_cmd, &resp);
+        if (rc != NGX_HTTP_OK) {
+            goto out;
+        }
 
-    if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
-        if (apicf->check_only) {
-            if (arg_cmd != CHECK_ONE_PEER_STATUS &&
-                arg_cmd != CHECK_ALL_PEERS_STATUS) {
-                return NGX_HTTP_NOT_ALLOWED;
+        if (apicf->used_module & NGX_HEALTH_DETECT_API_ON_HTTP) {
+            if (apicf->check_only) {
+                if (arg_cmd != CHECK_ONE_PEER_STATUS &&
+                    arg_cmd != CHECK_ALL_PEERS_STATUS) {
+                    return NGX_HTTP_NOT_ALLOWED;
+                }
+            }
+        } else {
+            if (apicf->stream_check_only) {
+                if (arg_cmd != CHECK_ONE_PEER_STATUS &&
+                    arg_cmd != CHECK_ALL_PEERS_STATUS) {
+                    return NGX_HTTP_NOT_ALLOWED;
+                }
             }
         }
     } else {
-        if (apicf->stream_check_only) {
-            if (arg_cmd != CHECK_ONE_PEER_STATUS &&
-                arg_cmd != CHECK_ALL_PEERS_STATUS) {
-                return NGX_HTTP_NOT_ALLOWED;
-            }
-        }
+        arg_cmd = CHECK_ALL_PEERS_STATUS;
     }
+
 
     if (r->method == NGX_HTTP_GET || r->method == NGX_HTTP_HEAD ||
         r->method == NGX_HTTP_DELETE) {
