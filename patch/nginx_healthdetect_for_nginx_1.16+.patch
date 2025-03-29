@@ -125,7 +125,7 @@ index f72de3ee..bce1740c 100644
  
 +#if (NGX_HTTP_HEALTH_DETECT)
 +                if (!server[i].down) {
-+                    ngx_http_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                    ngx_http_health_detect_upstream_add_peer(cf->pool,us, &server[i].name, &server[i].addrs[j]);
 +                }
 +#endif
 +
@@ -138,7 +138,7 @@ index f72de3ee..bce1740c 100644
  
 +#if (NGX_HTTP_HEALTH_DETECT)
 +                if (!server[i].down) {
-+                    ngx_http_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                    ngx_http_health_detect_upstream_add_peer(cf->pool,us, &server[i].name, &server[i].addrs[j]);
 +                }
 +#endif
 +
@@ -271,7 +271,7 @@ index 36e2ec5c..5dadd1cb 100644
  
 +#if (NGX_STREAM_HEALTH_DETECT)
 +                if (!server[i].down) {
-+                    ngx_stream_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                    ngx_stream_health_detect_upstream_add_peer(cf->pool, us, &server[i].name, &server[i].addrs[j]);
 +                }
 +#endif
 +
@@ -284,7 +284,7 @@ index 36e2ec5c..5dadd1cb 100644
  
 +#if (NGX_STREAM_HEALTH_DETECT)
 +                if (!server[i].down) {
-+                    ngx_stream_health_detect_upstream_add_peer(us, &server[i].name, &server[i].addrs[j]);
++                    ngx_stream_health_detect_upstream_add_peer(cf->pool, us, &server[i].name, &server[i].addrs[j]);
 +                }
 +#endif
 +

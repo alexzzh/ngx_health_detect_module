@@ -39,7 +39,7 @@ static ngx_rbtree_node_t *ngx_stream_health_detect_peers_rbtree_lookup(
 ngx_rbtree_node_t *ngx_stream_health_detect_peers_shm_rbtree_lookup(
     uint32_t hash, ngx_str_t *key);
 ngx_int_t ngx_stream_health_detect_add_or_update_node(
-    ngx_health_detect_detect_policy_t *policy);
+    ngx_pool_t * pool, ngx_health_detect_detect_policy_t *policy);
 static ngx_int_t ngx_stream_health_detect_add_or_update_node_on_shm(
     ngx_health_detect_detect_policy_t *policy);
 ngx_int_t ngx_stream_health_detect_delete_node(ngx_str_t *key);
@@ -1308,7 +1308,7 @@ failed:
 
 static ngx_int_t
 ngx_stream_health_detect_add_or_update_node_on_local(
-    ngx_health_detect_detect_policy_t *policy, ngx_uint_t start_detect_timer)
+   ngx_pool_t *pool, ngx_health_detect_detect_policy_t *policy, ngx_uint_t start_detect_timer)
 {
     uint32_t hash;
     ngx_health_detect_peer_t *opeer;
@@ -1352,12 +1352,16 @@ ngx_stream_health_detect_add_or_update_node_on_local(
                            MAX_SEND_CONTENT_LEN_MAX_VALUE /*send_content*/ +
                            sizeof("syslog") - 1 /*alert method*/;
 
-    temp_pool = ngx_create_pool(
+    if(pool == NULL){
+        temp_pool = ngx_create_pool(
         ngx_align(peer_size + peer_policy_max_size, ngx_cacheline_size),
         ngx_cycle->log);
-    if (temp_pool == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+        if (temp_pool == NULL) {
+           ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
             "on local: op(add/update) create pool error");
+        }
+    } else {
+       temp_pool = pool; 
     }
 
     node = ngx_pcalloc(temp_pool, peer_size);
@@ -1371,6 +1375,12 @@ ngx_stream_health_detect_add_or_update_node_on_local(
 
     peer = (ngx_health_detect_peer_t *) &node->color;
     peer->temp_pool = temp_pool;
+
+    if(pool == NULL){
+         peer->using_cf_pool = 0;
+    } else {
+         peer->using_cf_pool = 1;
+    }
 
     peer->default_policy =
         ngx_stream_health_detect_get_default_detect_policy(policy->data.type);
@@ -1449,7 +1459,7 @@ failed:
 
 ngx_int_t
 ngx_stream_health_detect_add_or_update_node(
-    ngx_health_detect_detect_policy_t *policy)
+    ngx_pool_t *pool, ngx_health_detect_detect_policy_t *policy)
 {
     ngx_int_t rc;
 
@@ -1458,7 +1468,7 @@ ngx_stream_health_detect_add_or_update_node(
         return rc;
     }
 
-    return ngx_stream_health_detect_add_or_update_node_on_local(policy, 1);
+    return ngx_stream_health_detect_add_or_update_node_on_local(pool, policy, 1);
 }
 
 static void
@@ -1476,7 +1486,7 @@ ngx_stream_health_detect_free_node(ngx_rbtree_node_t *node)
 
     ngx_rbtree_delete(&peers_manager_ctx->peers->rbtree, node);
 
-    if (peer->temp_pool != NULL) {
+    if (peer->temp_pool != NULL && !peer->using_cf_pool) {
         ngx_destroy_pool(peer->temp_pool);
     }
 }
@@ -2096,7 +2106,7 @@ ngx_stream_health_detect_construct_policy(ngx_pool_t *temp_pool,
 
 ngx_uint_t
 ngx_stream_health_detect_upstream_add_peer(ngx_stream_upstream_srv_conf_t *us,
-    ngx_str_t *server, ngx_addr_t *peer_addr)
+    ngx_pool_t *pool, ngx_str_t *server, ngx_addr_t *peer_addr)
 {
     ngx_int_t rc;
     ngx_pool_t *temp_pool;
@@ -2128,9 +2138,9 @@ ngx_stream_health_detect_upstream_add_peer(ngx_stream_upstream_srv_conf_t *us,
     }
 
     if (ngx_process == NGX_PROCESS_WORKER) {
-        rc = ngx_stream_health_detect_add_or_update_node(policy);
+        rc = ngx_stream_health_detect_add_or_update_node(NULL, policy);
     } else {
-        rc = ngx_stream_health_detect_add_or_update_node_on_local(policy, 0);
+        rc = ngx_stream_health_detect_add_or_update_node_on_local(NULL, policy, 0);
     }
 
     if (rc == NGX_OK) {
@@ -2441,7 +2451,7 @@ ngx_stream_health_detect_sync_peers_shm_to_peers()
                     "process(%P)",
                     peer_name, ngx_pid);
                 ngx_stream_health_detect_add_or_update_node_on_local(
-                    &peer_shm->policy, 1);
+                    NULL, &peer_shm->policy, 1);
             }
         }
     }
